@@ -1,0 +1,9 @@
+{
+  "name": "zalo-local-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node src/main.mjs", "login": "node src/main.mjs login", "groups": "node src/main.mjs groups", "test": "node --test" },
+  "engines": { "node": ">=22" },
+  "dependencies": { "zca-js": "2.1.2" }
+}
