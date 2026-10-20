@@ -1,5 +1,7 @@
 # Trợ lý Zalo cục bộ — bản thử nhận tin
 
+> Đang xây thêm JEV. Xem **[PROGRESS.md](PROGRESS.md)** để biết trạng thái mới nhất và cách tiếp tục. Provider Claude CLI hiện chưa qua smoke test; chưa dùng chế độ live. Nội dung phía dưới mô tả bản nhận tin ban đầu.
+
 Đã tải mã và dựng dự án ngày 20/10/2026. Dùng tài khoản cá nhân, không dùng OA và chưa cần n8n/VPS.
 
 ## Trạng thái thực tế

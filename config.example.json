@@ -1,4 +1,15 @@
 {
   "allowedGroupId": "",
-  "contextLimit": 30
+  "contextLimit": 30,
+  "ownerUserId": "",
+  "mode": "dry-run",
+  "autoSendCategories": ["greeting"],
+  "ai": {
+    "provider": "claude-cli",
+    "executable": "claude",
+    "model": "",
+    "timeoutMs": 120000,
+    "mcpServers": {},
+    "allowedMcpTools": []
+  }
 }
