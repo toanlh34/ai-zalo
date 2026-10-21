@@ -1,6 +1,7 @@
 {
   "allowedGroupId": "",
   "contextLimit": 30,
+  "maxPendingTasks": 100,
   "ownerUserId": "",
   "mode": "dry-run",
   "autoSendCategories": ["greeting"],

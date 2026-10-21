@@ -1,55 +1,87 @@
-# Trợ lý Zalo cục bộ — bản thử nhận tin
+# JEV — agent trong Zalo
 
-> Đang xây thêm JEV. Xem **[PROGRESS.md](PROGRESS.md)** để biết trạng thái mới nhất và cách tiếp tục. Provider Claude CLI hiện chưa qua smoke test; chưa dùng chế độ live. Nội dung phía dưới mô tả bản nhận tin ban đầu.
+JEV chạy trên PC Windows, dùng Claude CLI đã đăng nhập để đọc tin nhóm, soạn trả lời và báo chủ qua tin riêng. Chủ duyệt hoặc điều khiển ngay trong Zalo. Hiện đã xây luồng thiết lập/chạy; **chưa online vì tài khoản Zalo agent sẽ được đăng ký sau**. Chưa xác minh Claude và Zalo thật trả lời thành công cùng nhau.
 
-Đã tải mã và dựng dự án ngày 20/10/2026. Dùng tài khoản cá nhân, không dùng OA và chưa cần n8n/VPS.
+## Khi đã có tài khoản Zalo riêng
 
-## Trạng thái thực tế
-
-- Đã cài `zca-js@2.1.2`, có package-lock.json; bỏ chạy lifecycle scripts khi cài.
-- Đã kiểm thử 3 trường hợp tự động về lọc tin và ngữ cảnh; tất cả đạt.
-- Đã kiểm thử mã hóa/giải mã và ghi đè phiên DPAPI bằng dữ liệu giả trên máy này; đạt.
-- Đã kiểm tra thiếu ID nhóm thì chương trình dừng trước đăng nhập.
-- CHƯA quét QR, CHƯA xác minh nhận/gửi tin thật. Đây chưa phải trợ lý AI hoàn chỉnh.
-
-## Chạy trên PowerShell
+1. Đăng ký tài khoản cho agent trên điện thoại. Kết bạn với tài khoản cá nhân của chủ; tạo một nhóm thử và thêm cả hai tài khoản.
+2. Trên PC, vào thư mục dự án và chạy:
 
 ```powershell
-cd C:\Setups\zalo-local-lab\assistant
-npm run login
+npm run setup
 ```
 
-Chương trình hiện đường dẫn `.private\login-qr.png`. Mở ảnh trên chính máy này, dùng Zalo của tài khoản SIM riêng quét và xác nhận. Không quét bằng tài khoản của người khác. QR sẽ bị xóa sau khi đăng nhập kết thúc. Nếu QR hết hạn, chạy lại lệnh.
-
-Tạo nhóm thử riêng, thêm tài khoản bot và tài khoản của bạn; nên có thêm một người thử vì thư viện có loại bỏ tin do chính tài khoản bot gửi. Sau đó:
+3. Quét QR bằng **tài khoản agent**. QR được mở trên máy Windows và xóa sau đăng nhập. Nếu đã có phiên, setup cho chọn dùng lại; phiên hỏng sẽ chuyển sang QR mới.
+4. Chọn nhóm theo danh sách. Dùng **tài khoản chủ** nhắn riêng vào agent dòng `/jev pair <mã>` đang hiện trên terminal. Mã dùng một lần, hết hạn sau 5 phút. Không gửi mã vào nhóm. Xác nhận nhóm/chủ trên terminal bằng `LUU`.
+5. Setup lưu cấu hình với Claude CLI và mode=dry-run. Chạy để xem bản nháp trước:
 
 ```powershell
-npm run groups
-notepad config.json
+npm run agent -- --dry-run
 ```
 
-Lệnh groups chỉ lấy ID và tên nhóm của tài khoản, chưa bật listener, không lưu danh sách. Điền đúng ID nhóm thử, ví dụ (thay số này bằng ID thật):
-
-```json
-{"allowedGroupId":"1234567890","contextLimit":30}
-```
+Dry-run có kết nối Zalo và có gọi Claude với tin nhóm/tài liệu kiến thức, nhưng **không gửi tin nhóm hoặc phản hồi DM**. Xem `npm run jev -- list` / `reports`, Ctrl+C để dừng.
+6. Để bật trả lời thật đúng nhóm vừa chọn:
 
 ```powershell
-npm start
+npm run agent -- --live
+# hoặc:
+npm start -- --live
 ```
 
-Nhờ tài khoản khác gửi văn bản vào nhóm thử. Terminal sẽ hiện tin và số tin trong ngữ cảnh. Thử gửi ở nhóm khác và tin riêng: không được hiện trong terminal. Ctrl+C để dừng. Chạy `npm test` để kiểm thử lại bằng dữ liệu giả.
+Cờ mode chỉ áp dụng cho lần chạy đó; file cấu hình vẫn giữ dry-run từ setup. Giữ PC và tiến trình này chạy; đây chưa phải dịch vụ tự khởi động hoặc máy chủ chạy 24/7.
 
-## Phạm vi và dữ liệu
+## Agent làm gì
 
-- Chỉ một tài khoản và đúng một ID nhóm được xử lý. Chỉ nhận văn bản mới; không tải ảnh/tệp, không đọc lịch sử.
-- Kết nối cấp tài khoản có thể đưa tin ở các cuộc trò chuyện khác tới SDK trong bộ nhớ. Bộ lọc ứng dụng loại ngay trước khi ghi log/giữ ngữ cảnh; không thể cam kết máy chủ chỉ chuyển riêng nhóm được phép.
-- Ngữ cảnh giữ tối đa 30 tin trong RAM (cấu hình 1–100), mỗi tin tối đa 8.000 ký tự, mất khi dừng. Terminal có hiển thị nội dung nhóm thử; không chia sẻ bản ghi terminal chứa dữ liệu khách hàng.
-- Không có mã gọi sendMessage, gửi typing, webhook hoặc nhà cung cấp AI. Không có cổng HTTP công khai.
-- Phiên lưu tại `.private\session.dpapi`, mã hóa bằng Windows DPAPI theo người dùng Windows hiện tại, thư mục bỏ ACL kế thừa và cấp quyền cho người dùng hiện tại. Không phải kho bí mật chống lại phần mềm đang chạy cùng người dùng hoặc quản trị viên.
-- Không đọc cookie trình duyệt, không nhập cookie từ tài khoản khác. Không gửi session/QR/config cá nhân lên Git hay vào chat. `.gitignore` đã loại dữ liệu riêng.
-- Phiên hết hạn thì chạy lại login; không thử đăng nhập liên tục. Muốn thu hồi quyền: đăng xuất phiên trong Zalo trên điện thoại rồi xóa file phiên cục bộ.
-- Chưa có AI: bước tiếp theo là tạo bản nháp trả lời từ ngữ cảnh trong nhóm, có người xem trước; chỉ thêm cơ chế gửi khi đã thống nhất quy tắc trả lời.
+- Chỉ nhận văn bản mới trong đúng nhóm đã chọn; không đọc lại lịch sử Zalo hoặc tải ảnh/tệp.
+- Dùng chỉ dẫn trong `agent/`, tài liệu Markdown trong `knowledge/` và ngữ cảnh nhóm để gọi Claude CLI. Không sao chép token/OAuth; không dùng API key.
+- Mặc định chỉ tự gửi lời chào đơn giản. Câu hỏi nghiệp vụ, giá, giảm giá hoặc trường hợp không chắc tạo bản nháp và báo chủ để duyệt. Cần bổ sung kiến thức thật vào `knowledge/` để trợ lý biết nội dung BIMUP.
+- Chỉ ghi câu JEV đã xác nhận gửi vào lịch sử bot. Bản nháp/thử khô/gửi chưa rõ kết quả không được coi là câu đã gửi.
+- Báo cáo nội bộ chỉ gửi riêng cho chủ, không ghép vào câu trả lời khách.
 
-Xem báo cáo mã nguồn ở `RESEARCH.vi.md`.
+## Chủ điều khiển qua tin riêng
 
+Khi agent chạy live, dùng tài khoản đã ghép nhắn riêng cho agent. Lệnh trong nhóm hoặc từ người khác không có quyền điều khiển. Tin lệnh không được chuyển cho Claude. Trong dry-run, lệnh vẫn có thể cập nhật trạng thái nhưng phản hồi chỉ lưu cục bộ.
+
+| Tin riêng | Tác dụng |
+| --- | --- |
+| `/jev help` | Xem trợ giúp. |
+| `/jev status` | Xem hàng chờ, trạng thái AI và báo cáo chờ. |
+| `/jev list` | Xem 10 task gần nhất và ID để duyệt. |
+| `/jev approve <id>` | Duyệt bản nháp đang review. |
+| `/jev approve <id> <câu trả lời>` | Chủ thay nội dung rồi duyệt. Cũng dùng được khi AI lỗi chưa có nháp. |
+| `/jev reject <id>` | Từ chối review, giải phóng chỗ hàng chờ. |
+| `/jev pause` / `/jev resume` | Dừng / cho phép gửi khách; không dừng AI hoặc báo cáo cho chủ. |
+| `/jev resume-ai` | Cho phép gọi AI lại sau khi provider hoạt động trở lại. |
+| `/jev retry <id>` | Xếp lại review và bỏ nháp cũ, có thể tự gửi theo mode/quy tắc hiện tại. |
+| `/jev close-task <id>` | Sau khi kiểm tra thực tế, đóng uncertain mà không gửi lại. |
+
+ID task được ghi đầu báo cáo, ví dụ `[JEV 123:456]`. Chép `123:456` vào lệnh duyệt. Lệnh có biên nhận trong SQLite nên replay cùng tin nhắn không thực thi lại, kể cả sau khởi động lại. Phản hồi của chủ và quyết định được lưu cùng giao dịch; phản hồi gửi lỗi/không rõ kết quả không tự gửi lại.
+
+Các lệnh tương đương vẫn dùng được cục bộ qua `npm run jev -- <lệnh>`. `npm run jev -- reports` xem tối đa 100 báo cáo gần nhất. `npm run agent -- --help` và `npm run setup -- --help` không đăng nhập hay kết nối dịch vụ.
+
+## Hàng chờ, gián đoạn và hạn mức
+
+- `maxPendingTasks` mặc định 100 (số nguyên 1–10000), tính toàn DB với queued/thinking/approved/sending/review/uncertain. Khi đầy, tin mới **không được lưu hoặc xử lý**; terminal cảnh báo. Xử lý tồn đọng rồi gửi lại bằng tin mới. Chưa có tự dọn DB cũ.
+- `contextLimit` mặc định 30 (1–100), tính tổng lịch sử khách và JEV. Không lặp tin hiện tại hoặc đưa yêu cầu xếp sau vào ngữ cảnh của yêu cầu trước.
+- Tin dài hơn 8.000 ký tự bị rút gọn và luôn cần chủ duyệt.
+- Claude hết hạn mức: task hiện tại vào review, AI tạm dừng qua khởi động lại; tin tiếp theo vẫn xếp hàng trong giới hạn. Chủ vẫn điều khiển/soạn câu duyệt được. Chỉ resume-ai khi provider hoạt động trở lại.
+- Ctrl+C khi runtime đang chạy sẽ ngừng nhận tin, hủy yêu cầu Claude đang chờ, đợi lượt gửi đang thực hiện ghi kết quả rồi đóng DB/nhả khóa; không khởi động worker mới chồng lên worker chưa dừng.
+- Sau dừng cưỡng bức, thinking thành review; sending hoặc báo cáo đang gửi thành uncertain. Không retry uncertain; kiểm tra Zalo thực tế trước khi close-task.
+- Nếu báo worker.lock đã tồn tại, kiểm tra PID trong file và tiến trình cũ trước khi xóa khóa. Setup và agent dùng cùng khóa, không tự xóa khóa của nhau.
+- DB cũ được nâng thêm bảng khi mở, giữ task/báo cáo và phục hồi lịch sử bot chỉ từ sent. Bot cũ không có mốc gửi chính xác.
+
+## Dữ liệu và quyền
+
+Phiên nằm ở `.private/session.dpapi`, mã hóa bằng Windows DPAPI theo người dùng Windows hiện tại. Thư mục .private giới hạn ACL; nội dung hội thoại/nháp/báo cáo trong SQLite hiện **chưa mã hóa**. Không đưa phiên, QR, config cá nhân hoặc log hội thoại lên Git/chat. File tạm của cấu hình cũng được bỏ qua trong Git.
+
+SDK kết nối cấp tài khoản có thể đưa tin cuộc trò chuyện khác vào bộ nhớ; router loại chúng trước ghi DB/gọi AI. Ngoại lệ là lệnh DM đúng tài khoản chủ, được xử lý riêng. Tin của nhóm được chọn và tài liệu Markdown dự án sẽ gửi tới Claude khi chạy agent, kể cả dry-run. Công cụ CLI mặc định trống; chưa tích hợp MCP BIMUP thật.
+
+## Kiểm thử và công cụ phụ
+
+`npm test` / `npm run test:offline`: **71 kiểm thử offline**. `npm run smoke`: **27 kiểm thử onboarding, runtime và ghép luồng**. Chỉ dùng dữ liệu/QR/transport/CLI giả và DB tạm; guard chặn mạng/executable ngoài Node/test cleanup. Không gọi Claude hay Zalo thật. Các thông báo quota/DM lỗi trong output là tình huống giả có chủ đích.
+
+Xem [báo cáo kiểm thử](reports/OFFLINE_TEST_REPORT.md) và [điểm tiếp tục](PROGRESS.md). Kiểm tra provider thật riêng bằng `npm run smoke:claude` không nằm trong test/smoke và chưa được chạy lại trong đợt này.
+
+`npm run listen` là bản listener chỉ nhận tin ban đầu. `npm run login` / `groups` là công cụ QR/danh sách nhóm riêng; luồng agent chính là setup → agent, không cần sửa ID bằng tay.
+
+Đã cài theo package-lock.json với `npm ci --ignore-scripts`; zca-js@2.1.2. Đã kiểm thử trên Node.js 24.15.0, Windows. Thư viện Zalo là zca-js không chính thức; trạng thái nhận/gửi thật chỉ được xác minh khi đăng nhập tài khoản của anh và thử trong nhóm riêng.

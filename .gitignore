@@ -1,4 +1,5 @@
 node_modules/
 .private/
 config.json
+config.json.*.tmp
 *.log

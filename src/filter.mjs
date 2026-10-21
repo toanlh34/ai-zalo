@@ -12,7 +12,7 @@ export function createInbox(groupId, limit = 30) {
       if (!data.msgId || !data.uidFrom) return null;
       const key = String(data.msgId);
       if (seen.has(key)) return null;
-      const item = { id: key, sender: String(data.uidFrom), text: data.content.slice(0, 8000), timestamp: String(data.ts ?? '') };
+      const item = { id: key, sender: String(data.uidFrom), text: data.content.slice(0, 8000), truncated: data.content.length > 8000, timestamp: String(data.ts ?? '') };
       seen.add(key);
       context.push(item);
       if (context.length > limit) seen.delete(context.shift().id);

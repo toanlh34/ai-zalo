@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/main.mjs", "login": "node src/main.mjs login", "groups": "node src/main.mjs groups", "jev": "node src/jev.mjs", "test": "node --test" },
+  "scripts": { "start": "node src/jev.mjs run", "agent": "node src/jev.mjs run", "setup": "node src/setup.mjs", "listen": "node src/main.mjs", "login": "node src/main.mjs login", "groups": "node src/main.mjs groups", "jev": "node src/jev.mjs", "smoke": "node --import ./scripts/offline-guard.mjs --test test/integration.test.mjs test/runtime.test.mjs test/onboarding.test.mjs", "smoke:claude": "node src/smoke.mjs", "test": "node --import ./scripts/offline-guard.mjs --test", "test:offline": "node --import ./scripts/offline-guard.mjs --test" },
   "engines": { "node": ">=22" },
   "dependencies": { "zca-js": "2.1.2" }
 }

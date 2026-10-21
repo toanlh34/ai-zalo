@@ -1,49 +1,54 @@
-import { readFileSync, existsSync, writeFileSync, rmSync, openSync, closeSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { Zalo } from 'zca-js';
-import { secureDirectory, loadSession } from './session.mjs';
-import { createInbox } from './filter.mjs';
-import { createAgent } from './agent.mjs';
-import { openStore } from './store.mjs';
-import { createWorker } from './worker.mjs';
-const root=fileURLToPath(new URL('../',import.meta.url));
-const dir=join(root,'.private'), pausePath=join(dir,'PAUSED');
-let store,api,timer,lockFd;
-const lockPath=join(dir,'worker.lock');
-try {
-  secureDirectory(dir);
-  store=openStore(join(dir,'jev.sqlite'));
-  const [command='run',id,...words]=process.argv.slice(2);
-  if(command==='list'){console.log(JSON.stringify(store.list(),null,2));}
-  else if(command==='reports'){console.log(JSON.stringify(store.db.prepare('SELECT * FROM reports ORDER BY id DESC LIMIT 100').all(),null,2));}
-  else if(command==='pause'){writeFileSync(pausePath,'paused');console.log('Đã dừng gửi khách.');}
-  else if(command==='resume'){rmSync(pausePath,{force:true});console.log('Đã bỏ dừng gửi khách.');}
-  else if(command==='approve'){
-    const task=store.get(id);if(!task||task.status!=='review')throw Error('Task không ở trạng thái review');
-    const d=task.decision?JSON.parse(task.decision):{action:'escalate',category:'other',reason:'Chủ xử lý',report:'Chủ cung cấp câu trả lời'};
-    if(words.length)d.reply=words.join(' ');
-    if(!d.reply?.trim()||d.reply.length>1800)throw Error('Cần nội dung trả lời hợp lệ');
-    store.decision(id,d,'approved');store.report(id,'Anh đã duyệt nội dung trả lời.');console.log('Đã duyệt. Worker sẽ xử lý theo mode hiện tại.');
-  }else if(command==='reject'){if(!store.transition(id,'review','rejected'))throw Error('Task không ở review');store.report(id,'Anh từ chối bản nháp; chưa gửi khách.');}
-  else if(command==='run'){
-    const config=JSON.parse(readFileSync(join(root,'config.json'),'utf8'));
-    if(!['dry-run','live'].includes(config.mode))throw Error('Cần mode dry-run hoặc live');
-    if(!/^\d+$/.test(config.ownerUserId??''))throw Error('Cần ownerUserId để báo cáo');
-    const inbox=createInbox(config.allowedGroupId,config.contextLimit??30);
-    const agent=createAgent(config.ai??{},root);
-    lockFd=openSync(lockPath,'wx');writeFileSync(lockFd,String(process.pid));
-    store.recover();
-    api=await new Zalo({selfListen:false,logging:false,checkUpdate:false}).login(loadSession(dir));
-    const worker=createWorker({store,agent,config,pausePath,send:(text,to,type)=>api.sendMessage(text,to,type)});
-    api.listener.on('message',message=>{const accepted=inbox.accept(message);if(!accepted)return;store.add(`${config.allowedGroupId}:${accepted.item.id}`,config.allowedGroupId,accepted.item);});
-    api.listener.on('error',()=>console.error('Listener lỗi.'));
-    api.listener.on('closed',()=>{console.error('Listener đóng. Khởi động lại thủ công.');cleanup();process.exitCode=1;});
-    api.listener.on('connected',()=>console.log(`JEV đã kết nối. mode=${config.mode}. Xem báo cáo: npm run jev -- reports`));
-    timer=setInterval(()=>worker.tick().catch(()=>console.error('Worker lỗi; kiểm tra task và báo cáo.')),1000);
-    api.listener.start({retryOnClose:false});
-    process.on('SIGINT',()=>{cleanup();process.exit(0);});process.on('SIGTERM',()=>{cleanup();process.exit(0);});
-  }else throw Error('Lệnh: run/list/reports/approve/reject/pause/resume');
-  if(command!=='run'){store.close();store=null;}
-}catch(e){console.error(`JEV chưa chạy được: ${e.code==='EEXIST'?'worker.lock đã có; kiểm tra tiến trình cũ trước khi xóa lock':e.message?.startsWith('Cần')?e.message:'Kiểm tra cấu hình/phiên và lệnh. Không chia sẻ file .private.'}`);cleanup();process.exitCode=1;}
-function cleanup(){clearInterval(timer);try{api?.listener.stop();}catch{}if(lockFd!==undefined){closeSync(lockFd);rmSync(lockPath,{force:true});lockFd=undefined;}}
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {secureDirectory,loadSession} from './session.mjs';
+import {createAgent} from './agent.mjs';
+import {handleLocalCommand,usage} from './commands.mjs';
+import {openStore} from './store.mjs';
+import {createRuntime,validateRuntimeConfig} from './runtime.mjs';
+import {acquireLock} from './lock.mjs';
+
+const root=fileURLToPath(new URL('../',import.meta.url)),dir=join(root,'.private'),pausePath=join(dir,'PAUSED');
+let store,runtime,releaseLock,shutdownPromise;
+async function shutdown(){
+  if(shutdownPromise)return shutdownPromise;
+  shutdownPromise=(async()=>{
+    await runtime?.stop();
+    if(store){store.close();store=null;}
+    releaseLock?.();releaseLock=null;
+  })();
+  return shutdownPromise;
+}
+try{
+  const [command='run',...args]=process.argv.slice(2);
+  if(command==='help'||command==='--help'||args.includes('--help'))console.log(`${usage}\nrun --live: bật trả lời nhóm đã cấu hình; run --dry-run: chỉ tạo bản nháp.`);
+  else{
+    secureDirectory(dir);
+    if(command==='run')releaseLock=acquireLock(join(dir,'worker.lock'));
+    store=openStore(join(dir,'jev.sqlite'));
+    const [id,...words]=args;
+    if(handleLocalCommand({store,command,id,words,pausePath}))await shutdown();
+    else if(command==='run'){
+      if(args.some(arg=>!['--live','--dry-run'].includes(arg))||(args.includes('--live')&&args.includes('--dry-run')))throw Error('Cần chọn --live hoặc --dry-run');
+      let config;
+      try{config=JSON.parse(readFileSync(join(root,'config.json'),'utf8'));}catch{throw Error('Cần chạy npm run setup để đăng nhập và chọn nhóm/chủ trước');}
+      if(args.includes('--live'))config.mode='live';
+      if(args.includes('--dry-run'))config.mode='dry-run';
+      if(!/^\d+$/.test(config.allowedGroupId??'')||!/^\d+$/.test(config.ownerUserId??''))throw Error('Cần chạy npm run setup để chọn đúng nhóm và chủ');
+      validateRuntimeConfig(config);
+      const agent=createAgent(config.ai??{},root);
+      let session;try{session=loadSession(dir);}catch{throw Error('Cần đăng nhập Zalo: npm run setup');}
+      const {Zalo}=await import('zca-js');
+      const api=await new Zalo({selfListen:false,logging:false,checkUpdate:false}).login(session);
+      store.recover();
+      runtime=createRuntime({api,store,agent,config,pausePath,onClosed:()=>{process.exitCode=1;return shutdown();}});
+      const signal=()=>{console.log('Đang dừng agent và kết thúc công việc đang chạy...');void shutdown().catch(()=>{console.error('Chưa dừng sạch; kiểm tra worker.lock trước khi chạy lại.');process.exitCode=1;});};
+      process.once('SIGINT',signal);process.once('SIGTERM',signal);
+      runtime.start();
+    }else throw Error(`Cần chọn lệnh hợp lệ. ${usage}`);
+  }
+}catch(error){
+  console.error(`JEV chưa chạy được: ${error.code==='EEXIST'?'worker.lock đã có; kiểm tra agent hoặc setup đang chạy':error.message?.startsWith('Cần')?error.message:'Kiểm tra cấu hình/phiên Zalo và kết nối. Không chia sẻ dữ liệu .private.'}`);
+  try{await shutdown();}catch{console.error('Giữ worker.lock để kiểm tra tiến trình chưa dừng sạch.');}
+  process.exitCode=1;
+}
