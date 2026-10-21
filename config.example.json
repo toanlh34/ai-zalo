@@ -4,7 +4,7 @@
   "maxPendingTasks": 100,
   "ownerUserId": "",
   "mode": "dry-run",
-  "autoSendCategories": ["greeting"],
+  "autoSendCategories": ["greeting", "documented_answer", "other"],
   "ai": {
     "provider": "claude-cli",
     "executable": "claude",

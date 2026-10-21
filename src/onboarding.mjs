@@ -47,12 +47,12 @@ export async function listGroups(api){
   return result;
 }
 export function setupConfig(template,groupId,ownerUserId){
-  createInbox(groupId,template.contextLimit??30);
+  const all=groupId==='*';if(!all)createInbox(groupId,template.contextLimit??30);
   validateQueueLimit(template.maxPendingTasks??100);
   if(!/^\d+$/.test(ownerUserId))throw Error('Chủ không hợp lệ');
   const provider=template.ai?.provider??'claude-cli';
   if(!['claude-cli','deepseek','gemini-api','gemini-cli','antigravity-cli'].includes(provider))throw Error('Cần chọn provider AI hợp lệ.');
-  return {...template,allowedGroupId:groupId,ownerUserId,mode:'dry-run',autoSendCategories:template.autoSendCategories??['greeting'],ai:{...template.ai,provider}};
+  return {...template,chatScope:all?'all':'single',allowedGroupId:all?'':groupId,ownerUserId,mode:'dry-run',autoSendCategories:template.autoSendCategories??['greeting','documented_answer','other'],ai:{...template.ai,provider}};
 }
 export async function configureAgent({api,template,ask,log=console.log,onCode,signal}){
   let groups=await listGroups(api);
@@ -60,9 +60,10 @@ export async function configureAgent({api,template,ask,log=console.log,onCode,si
     log('Tạo nhóm thử với tài khoản chủ và thêm tài khoản agent vào nhóm.');
     await ask('Xong thì nhấn Enter để lấy lại danh sách nhóm: ');groups=await listGroups(api);
   }
+  log('0. Mọi nhóm agent tham gia (trả lời khi được tag/gọi tên/trả lời tin) + tin riêng');
   groups.forEach((group,index)=>log(`${index+1}. ${group.name} (${group.id})`));
   let selected;
-  while(!selected){const index=Number((await ask('Chọn số thứ tự nhóm agent được trả lời: ')).trim());if(Number.isInteger(index)&&index>=1&&index<=groups.length)selected=groups[index-1];}
+  while(!selected){const index=Number((await ask('Chọn số thứ tự (0 = mọi nhóm + tin riêng): ')).trim());if(index===0)selected={id:'*',name:'mọi nhóm + tin riêng'};else if(Number.isInteger(index)&&index>=1&&index<=groups.length)selected=groups[index-1];}
   log('Dùng tài khoản Zalo cá nhân của chủ, gửi mã ghép trong tin RIÊNG vào tài khoản agent.');
   const owner=await pairOwner({api,onCode,signal});
   const confirm=await ask(`Đã ghép chủ ${owner}, nhóm ${selected.name}. Gõ LUU để lưu cấu hình dry-run: `);

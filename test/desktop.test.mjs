@@ -1,25 +1,73 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,rmSync,writeFileSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {EventEmitter} from 'node:events';
 import {createDesktopController} from '../desktop/controller.mjs';
 const sourceRoot=fileURLToPath(new URL('../',import.meta.url));
-function fixture(t){
+function fixture(t,{legacy=true}={}){
   const dataRoot=mkdtempSync(join(tmpdir(),'jev-desktop-'));
+  if(legacy)writeFileSync(join(dataRoot,'config.json'),JSON.stringify({allowedGroupId:'',ownerUserId:'',contextLimit:30,maxPendingTasks:100,mode:'dry-run',autoSendCategories:['greeting'],ai:{provider:'deepseek',model:'deepseek-flash'}}));
   const listener=new EventEmitter();listener.start=()=>{};listener.stop=()=>{};
   const api={listener,getOwnId:()=> '999',getAllGroups:async()=>({gridVerMap:{'123':1}}),getGroupInfo:async()=>({gridInfoMap:{'123':{name:'Nhóm thử'}}})};
   let starts=0,stops=0;const events=[],sessionDirs=[];
-  const service=createDesktopController({dataRoot,sourceRoot,emit:(event,data)=>events.push({event,data}),dependencies:{
+  const options={dataRoot,sourceRoot,emit:(event,data)=>events.push({event,data}),dependencies:{
     secureDirectory:dir=>mkdirSync(dir,{recursive:true}),loadSession:dir=>{sessionDirs.push(dir);return {};},
     zalo:async()=>({Zalo:class{async login(){return api;}}}),
     createAgent:()=>({async decide(){return {action:'send',category:'greeting',reply:'Xin chào',reason:'Chào hỏi',report:'Khách chào'};}}),createRuntime:({log})=>({start(){starts++;log('JEV đã kết nối nhóm đã chọn.');},async stop(){stops++;}})
-  }});
+  }};
+  const service=createDesktopController(options);
   t.after(async()=>{await service.close();rmSync(dataRoot,{recursive:true,force:true,maxRetries:10,retryDelay:50});});
-  return {service,dataRoot,api,events,sessionDirs,get starts(){return starts;},get stops(){return stops;}};
+  return {service,options,dataRoot,api,events,sessionDirs,get starts(){return starts;},get stops(){return stops;}};
 }
+test('fresh desktop has no invented AI or assistant and guides profile-specific actions',async t=>{
+  const x=fixture(t,{legacy:false}),call=x.service.dispatch;
+  let snapshot=x.service.snapshot();
+  assert.deepEqual(snapshot.management,{version:1,activeId:null,connections:[],assistants:[]});
+  assert.deepEqual(snapshot.config.ai,{});assert.equal(snapshot.session,false);assert.equal(snapshot.paused,false);
+  assert.deepEqual(snapshot.statuses,{});assert.deepEqual(snapshot.tasks,[]);assert.deepEqual(snapshot.reports,[]);
+  assert.equal(existsSync(join(x.dataRoot,'.private','jev.sqlite')),false);
+  for(const action of ['test-ai','set-mode','settings','login','groups','group','pair','start','command'])await assert.rejects(call(action),/tạo và chọn trợ lý/);
+  const c=await call('save-connection',{name:'My API',provider:'deepseek'});
+  const a=await call('save-assistant',{name:'My assistant',role:'Support',skill:'Docs',connectionIds:[c.id],strategy:'primary'});
+  assert.equal(x.service.snapshot().management.activeId,null,'Saving does not select a profile implicitly');
+  await call('activate-assistant',{id:a.id});snapshot=x.service.snapshot();
+  assert.equal(snapshot.management.activeId,a.id);assert.equal(snapshot.config.ai.provider,'deepseek');
+  assert.equal(snapshot.config.allowedGroupId,'');assert.equal(snapshot.config.ownerUserId,'');
+  assert.equal((await call('test-ai')).ok,true);
+});
+
+test('removing the active legacy default preserves history and does not select another assistant',async t=>{
+  const x=fixture(t),call=x.service.dispatch;
+  writeFileSync(join(x.dataRoot,'.private','session.dpapi'),'synthetic-default-session');
+  const {openStore}=await import('../src/store.mjs'),historyPath=join(x.dataRoot,'.private','jev.sqlite'),history=openStore(historyPath);
+  history.add('preserved-history','123',{text:'Saved before deleting configuration'});history.close();
+  await call('command',{command:'pause'});
+  const c=await call('save-connection',{name:'Own API',provider:'gemini-api'});
+  const a=await call('save-assistant',{name:'Other assistant',role:'Support',skill:'Docs',connectionIds:[c.id],strategy:'primary'});
+  await call('delete-assistant',{id:'default'});await call('delete-connection',{id:'legacy-ai'});
+  let snapshot=x.service.snapshot();
+  assert.equal(snapshot.management.activeId,null);assert.equal(snapshot.management.assistants.length,1);
+  assert.deepEqual(snapshot.tasks,[]);assert.equal(snapshot.paused,false);assert.equal(snapshot.session,false);assert.deepEqual(snapshot.config.ai,{});
+  assert.equal(existsSync(historyPath),true);assert.equal(existsSync(join(x.dataRoot,'.private','session.dpapi')),true);
+  const preserved=openStore(historyPath);try{assert.equal(preserved.get('preserved-history').status,'queued');}finally{preserved.close();}
+  await call('activate-assistant',{id:a.id});snapshot=x.service.snapshot();
+  assert.equal(snapshot.management.activeId,a.id);assert.deepEqual(snapshot.tasks,[]);assert.equal(snapshot.session,false);
+});
+
+test('deleting the last default and its AI stays empty after controller restart',async t=>{
+  const x=fixture(t),call=x.service.dispatch;
+  await call('delete-assistant',{id:'default'});await call('delete-connection',{id:'legacy-ai'});
+  await x.service.close();
+  const reopened=createDesktopController(x.options);t.after(()=>reopened.close());
+  const snapshot=reopened.snapshot();
+  assert.deepEqual(snapshot.management,{version:1,activeId:null,connections:[],assistants:[]});
+  assert.deepEqual(snapshot.config.ai,{});assert.equal(snapshot.config.mode,'dry-run');
+  assert.deepEqual(snapshot.tasks,[]);assert.equal(snapshot.session,false);
+});
+
 test('desktop manages settings, group, owner pairing, start/stop without terminal',async t=>{
   const x=fixture(t),call=x.service.dispatch;
   await call('settings',{provider:'deepseek',model:'deepseek-flash',mode:'dry-run'});
@@ -30,6 +78,8 @@ test('desktop manages settings, group, owner pairing, start/stop without termina
   assert.equal(x.service.snapshot().config.ownerUserId,'456');
   await call('start');assert.equal(x.starts,1);assert.equal(x.service.snapshot().connected,true);
   await assert.rejects(call('settings',{provider:'deepseek'}));
+  await assert.rejects(call('delete-assistant',{id:'default'}),/Dừng agent/);
+  assert.equal(x.service.snapshot().management.activeId,'default');
   await call('command',{command:'pause'});assert.equal(x.service.snapshot().paused,true);
   await call('command',{command:'resume'});assert.equal(x.service.snapshot().paused,false);
   await call('stop');assert.equal(x.stops,1);assert.equal(x.service.snapshot().running,false);
@@ -47,6 +97,8 @@ test('desktop requires selected group, limits commands and cancels pairing',asyn
   await assert.rejects(call('start'));
   await call('groups');
   const pair=call('pair');await new Promise(resolve=>setImmediate(resolve));
+  await assert.rejects(call('delete-assistant',{id:'default'}),/Dừng agent/);
+  assert.equal(x.service.snapshot().management.activeId,'default');
   await call('cancel');await assert.rejects(pair,/hủy/);
   assert.equal(x.service.snapshot().operation,null);
   assert.equal(x.service.snapshot().config.ownerUserId,'');

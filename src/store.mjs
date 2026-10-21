@@ -58,6 +58,14 @@ export function openStore(path) {
         return true;
       });
     },
+    // Tin nhóm không gọi trợ lý: chỉ lưu làm ngữ cảnh, không tạo task/gọi AI. Giữ tối đa 200 tin mỗi cuộc trò chuyện.
+    addContext(id,group,input){
+      return transaction(()=>{
+        const added=db.prepare('INSERT OR IGNORE INTO messages(task_id,group_id,role,payload) VALUES(?,?,?,?)').run(`ctx:${id}`,group,'user',JSON.stringify(input)).changes===1;
+        db.prepare("DELETE FROM messages WHERE group_id=? AND task_id LIKE 'ctx:%' AND seq<=(SELECT seq FROM messages WHERE group_id=? AND task_id LIKE 'ctx:%' ORDER BY seq DESC LIMIT 1 OFFSET 200)").run(group,group);
+        return added;
+      });
+    },
     list(){return db.prepare('SELECT id,group_id,decision,status,created FROM tasks ORDER BY rowid DESC LIMIT 100').all();},
     get(id){return db.prepare('SELECT * FROM tasks WHERE id=?').get(id);},
     next({includeQueued=true,includeApproved=true}={}){
@@ -89,7 +97,10 @@ export function openStore(path) {
       if(!Number.isInteger(limit)||limit<1||limit>100)throw Error('contextLimit phải từ 1 đến 100');
       const rows=beforeTaskId===undefined
         ?db.prepare('SELECT role,payload FROM messages WHERE group_id=? ORDER BY seq DESC LIMIT ?').all(group,limit)
-        :db.prepare('SELECT m.role,m.payload FROM messages m JOIN tasks t ON t.id=m.task_id WHERE m.group_id=? AND t.rowid<(SELECT rowid FROM tasks WHERE id=?) ORDER BY m.seq DESC LIMIT ?').all(group,beforeTaskId,limit);
+        :db.prepare(`SELECT m.role,m.payload FROM messages m LEFT JOIN tasks t ON t.id=m.task_id WHERE m.group_id=?
+          AND ((t.rowid IS NOT NULL AND t.rowid<(SELECT rowid FROM tasks WHERE id=?))
+            OR (t.rowid IS NULL AND m.task_id LIKE 'ctx:%' AND m.seq<(SELECT seq FROM messages WHERE task_id=? AND role='user')))
+          ORDER BY m.seq DESC LIMIT ?`).all(group,beforeTaskId,beforeTaskId,limit);
       return rows.reverse().map(row=>({...JSON.parse(row.payload),role:row.role}));
     },
     aiPaused(){return !!db.prepare("SELECT 1 FROM runtime_state WHERE key='ai_paused'").get();},

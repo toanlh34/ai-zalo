@@ -74,6 +74,15 @@ test('onboarding: khóa chặn hai agent và release không xóa khóa thay th�
   const old=acquireLock(path);writeFileSync(path,JSON.stringify({pid:0,token:'replacement'}));old();assert.equal(existsSync(path),true);
 });
 
+test('onboarding: tự động dọn worker.lock cũ khi tiến trình trước đã kết thúc',t=>{
+  const path=join(temp(t),'worker.lock');
+  writeFileSync(path,JSON.stringify({pid:999999,token:'dead-pid'}));
+  const release=acquireLock(path);
+  assert.equal(existsSync(path),true);
+  release();
+  assert.equal(existsSync(path),false);
+});
+
 test('toàn luồng: QR giả → chọn nhóm → ghép chủ → lưu → nhận tin → chủ duyệt trong Zalo → gửi',async t=>{
   const root=temp(t),client=api(),sent=[];
   client.getAllGroups=async()=>({gridVerMap:{'789':1}});

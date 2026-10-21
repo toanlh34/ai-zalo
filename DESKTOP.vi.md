@@ -6,11 +6,11 @@
 
 # BIMUP Zalo Assistance — ứng dụng Windows
 
-Mở `release/BIMUP-Zalo-Assistance-0.6.1-Windows.exe`. Đây là app portable, không cần cài Node.js hoặc mở terminal để sử dụng. Claude CLI vẫn cần cài riêng nếu chọn Claude; DeepSeek chỉ cần API key và số dư.
+Chạy `release/BIMUP-Zalo-Assistance-Setup-0.6.2.exe` để cài cho tài khoản Windows hiện tại. Sau đó mở **BIMUP Zalo Assistance** ngoài Desktop hoặc Start Menu. Bộ cài kèm [hướng dẫn sử dụng](HUONG-DAN-SU-DUNG.md), không cần cài Node.js hoặc mở terminal. Các nhà cung cấp CLI vẫn cần cài và đăng nhập riêng; API cần key và hạn mức. Cập nhật hoặc gỡ app giữ dữ liệu trong `%APPDATA%/jev-bimup-desktop`.
 
 ## Lần đầu sử dụng
 
-1. Vào **Thiết lập**, chọn **DeepSeek API**, nhập API key và bấm **Lưu key an toàn**, rồi **Lưu cấu hình AI**. Model mặc định `deepseek-flash`.
+1. Vào **Thiết lập AI**, bấm **Tạo kết nối AI**, đặt tên và tự chọn nhà cung cấp/model rồi lưu. Nếu dùng API, nhập key và bấm **Lưu key mã hóa**. App mới không tạo sẵn trợ lý hoặc kết nối. Vào **Trợ lý**, tạo hồ sơ, gán AI và bấm **Dùng trợ lý này** trước khi thiết lập Zalo.
 2. Bấm **Đăng nhập bằng QR**, quét bằng tài khoản Zalo riêng của JEV trên điện thoại.
 3. Chọn nhóm thử và bấm **Chọn nhóm này**. Tài khoản JEV phải có trong nhóm.
 4. Bấm **Ghép tài khoản chủ**. Dùng Zalo cá nhân của anh gửi riêng cho JEV dòng mã hiện trong app. Mã hết hạn sau 5 phút. Có nút hủy nếu muốn dừng chờ QR/ghép chủ.
@@ -41,6 +41,7 @@ Key DeepSeek được mã hóa bằng Windows và không hiển thị lại. Phi
 npm install
 npm run desktop
 npm run build:desktop
+npm run build:installer
 npm test
 npm run test:desktop
 node scripts/desktop-smoke.cjs --packaged

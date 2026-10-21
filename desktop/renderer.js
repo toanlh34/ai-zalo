@@ -1,6 +1,11 @@
 const $=id=>document.getElementById(id);
-let state,selected=null,settingsLoaded=false,locked=false,polling=false;
+let state,selected=null,settingsLoaded=false,locked=false,polling=false,activeAssistantId;
 const logs=[];
+const ALL_LABEL='Mọi nhóm đã tham gia + tin riêng';
+// Khớp src/filter.mjs scopeOf: không chọn nhóm cụ thể = mọi nhóm + tin riêng.
+const scopeAll=c=>c.chatScope==='all'||(c.chatScope!=='single'&&!/^\d+$/.test(c.allowedGroupId||''));
+const scopeLabel=c=>scopeAll(c)?ALL_LABEL:(c.groupName||c.allowedGroupId||'Chưa chọn nhóm');
+const whereLabel=input=>input.kind==='owner'?'Anh nhắn riêng':input.kind==='dm'?`Tin riêng · ${input.senderName||input.sender}`:input.kind==='group'?`${input.threadName||'Nhóm '+input.threadId} · ${input.senderName||input.sender}`:'';
 const statuses={queued:'Đang xếp hàng',thinking:'AI đang soạn',review:'Cần duyệt',approved:'Đã duyệt',sending:'Đang gửi',sent:'Đã gửi',dry_run:'Đã thử nháp',uncertain:'Chưa rõ kết quả',closed:'Đã đóng',rejected:'Đã từ chối'};
 function notice(text,error=false){$('notice').textContent=text;$('notice').classList.toggle('error',error);$('notice').hidden=false;}
 function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
@@ -17,61 +22,66 @@ async function perform(action,payload={},message){
 }
 async function refresh(){if(polling)return;polling=true;try{state=await request('snapshot');render();}catch{}finally{polling=false;}}
 function renderControls(){if(!state)return;const busy=locked||!!state.operation||state.stopping;
-  for(const id of ['save-settings','login','load-groups','save-group','pair'])$(id).disabled=busy||state.running;
-  $('start').disabled=busy||state.running||!state.session||!state.config.allowedGroupId||!state.config.ownerUserId;
+  const active=state.management?.assistants.find(a=>a.id===state.management.activeId);
+  for(const id of ['save-settings','mode','login','load-groups','group','save-group','pair'])$(id).disabled=busy||state.running||!active;
+  $('start').disabled=busy||state.running||!active||!state.config.ai?.provider||!state.session||!(scopeAll(state.config)||state.config.allowedGroupId)||!state.config.ownerUserId;
   $('stop').disabled=!state.running||state.stopping;
   $('pause').disabled=busy||!state.running;
   $('cancel').hidden=!state.operation;
 }
 function render(){const c=state.config,s=state.statuses;
+  const active=state.management?.assistants.find(a=>a.id===state.management.activeId);
+  if(activeAssistantId!==state.management?.activeId){activeAssistantId=state.management?.activeId;settingsLoaded=false;selected=null;detailSignature=null;}
   $('mcp-status').textContent=state.mcp?.enabled?'MCP quản trị app: sẵn sàng · chỉ trên máy này':'MCP quản trị app: chưa sẵn sàng';
-  const live=c.mode==='live',provider=providerNames[c.ai?.provider]||c.ai?.provider;
+  const live=c.mode==='live',provider=providerNames[c.ai?.provider]||c.ai?.provider||'Chưa chọn AI';
   $('mode-badge').textContent=live?'GỬI THẬT':'THỬ NHÁP';$('mode-badge').classList.toggle('live',live);
   const status=state.operation||(state.stopping?'Đang dừng':state.connected?'Đã kết nối':state.running?'Đang kết nối':'Đã dừng');
   $('side-status').textContent=status;$('side-dot').classList.toggle('on',state.connected);
   $('hero-title').textContent=state.running?(state.paused?'BIMUP Zalo Assistance đang tạm ngưng gửi.':state.aiPaused?'AI đang tạm dừng.':'BIMUP Zalo Assistance đang làm việc cùng anh.'):'Sẵn sàng hỗ trợ cùng anh.';
-  $('hero-description').textContent=state.operation|| (state.running?(live?'Đang theo dõi nhóm đã chọn. Anh có thể duyệt tin ngay trong app.':'Chế độ thử: BIMUP Zalo Assistance soạn nháp và lưu trên máy, chưa gửi bất kỳ tin nào.'):'Hoàn thành thiết lập rồi nhấn Chạy agent. Mọi trạng thái sẽ hiển thị tại đây.');
+  $('hero-description').textContent=state.operation|| (state.running?(live?(scopeAll(c)?'Đang nghe mọi nhóm (khi được gọi) và tin riêng. Anh có thể duyệt tin ngay trong app.':'Đang theo dõi nhóm đã chọn. Anh có thể duyệt tin ngay trong app.'):'Chế độ thử: BIMUP Zalo Assistance soạn nháp và lưu trên máy, chưa gửi bất kỳ tin nào.'):!active?'Tạo kết nối trong Thiết lập AI, rồi tạo và chọn trợ lý để kết nối Zalo.':'Hoàn thành thiết lập rồi nhấn Chạy agent. Mọi trạng thái sẽ hiển thị tại đây.');
   $('connection').textContent=state.connected?'Đã kết nối':state.running?'Đang nối…':state.session?'Có phiên đăng nhập':'Chưa đăng nhập';
-  $('group-summary').textContent=c.groupName||c.allowedGroupId||'Chưa chọn nhóm';
+  $('group-summary').textContent=scopeLabel(c);
   $('review-count').textContent=s.review||0;$('queue-count').textContent=(s.queued||0)+(s.thinking||0);
-  $('provider-summary').textContent=provider;$('ai-summary').textContent=state.aiPaused?'Đang dừng do số dư / hạn mức':c.ai?.model||'Model mặc định';
-  if(state.management){const a=state.management.assistants.find(a=>a.id===state.management.activeId);$('provider-summary').textContent=a.name;$('ai-summary').textContent=`${a.connectionIds.length} AI · ${a.strategy==='fallback'?'Có dự phòng':a.strategy==='round-robin'?'Luân phiên':provider}`;}
+  $('provider-summary').textContent=active?.name||'Chưa chọn trợ lý';
+  $('ai-summary').textContent=active?(state.aiPaused?'Đang dừng do số dư / hạn mức':`${active.connectionIds.length} AI · ${active.strategy==='fallback'?'Có dự phòng':active.strategy==='round-robin'?'Luân phiên':provider}`):'Tạo và chọn trợ lý để bắt đầu';
   $('pause').textContent=state.paused?'Cho phép gửi lại':'Tạm ngưng gửi';
   $('owner-status').textContent=c.ownerUserId?`Đã ghép chủ: ${c.ownerUserId}`:'Chưa ghép tài khoản chủ.';
 
   $('resume-ai').hidden=!state.aiPaused;
   if(!settingsLoaded){$('mode').value=c.mode;settingsLoaded=true;}
-  const current=$('group').value;const opts=state.groups.length?state.groups:c.allowedGroupId?[{id:c.allowedGroupId,name:c.groupName||c.allowedGroupId}]:[];
-  if(JSON.stringify(opts)!==$('group').dataset.options){$('group').replaceChildren(node('option','Chọn nhóm…'));$('group').firstChild.value='';for(const g of opts){const option=node('option',g.name);option.value=g.id;$('group').append(option);}$('group').value=opts.some(g=>g.id===current)?current:c.allowedGroupId;$('group').dataset.options=JSON.stringify(opts);}
+  const current=$('group').value;const opts=[{id:'*',name:ALL_LABEL+' (khuyến nghị)'},...(state.groups.length?state.groups:c.allowedGroupId?[{id:c.allowedGroupId,name:c.groupName||c.allowedGroupId}]:[])];const chosen=scopeAll(c)?'*':c.allowedGroupId;
+  if(JSON.stringify(opts)!==$('group').dataset.options){$('group').replaceChildren(node('option','Chọn nhóm…'));$('group').firstChild.value='';for(const g of opts){const option=node('option',g.name);option.value=g.id;$('group').append(option);}$('group').value=opts.some(g=>g.id===current)?current:chosen;$('group').dataset.options=JSON.stringify(opts);}
   $('checklist').replaceChildren();
-  for(const [done,title,description] of [[!['deepseek','gemini-api'].includes(c.ai?.provider)||state.management?.connections.find(ai=>ai.id===state.management.assistants.find(a=>a.id===state.management.activeId)?.connectionIds[0])?.keySaved,'Cấu hình AI',provider],[state.session,'Đăng nhập tài khoản BIMUP Zalo Assistance','Quét QR bằng tài khoản agent'],[!!c.allowedGroupId,'Chọn nhóm trả lời',c.groupName||c.allowedGroupId||'Bắt đầu với nhóm thử'],[!!c.ownerUserId,'Ghép tài khoản chủ','Chỉ chủ mới có quyền điều khiển qua Zalo']]){
+  const connection=state.management?.connections.find(ai=>ai.id===active?.connectionIds[0]);
+  const aiReady=!!connection&&(!['deepseek','gemini-api'].includes(connection.provider)||connection.keySaved);
+  for(const [done,title,description] of [[aiReady,'Cấu hình AI',provider],[!!active,'Chọn trợ lý',active?.name||'Tạo và chọn trợ lý trong Trợ lý'],[state.session,'Đăng nhập tài khoản BIMUP Zalo Assistance','Quét QR bằng tài khoản agent'],[scopeAll(c)||!!c.allowedGroupId,'Phạm vi trả lời',scopeLabel(c)],[!!c.ownerUserId,'Ghép tài khoản chủ','Chỉ chủ mới có quyền điều khiển qua Zalo']]){
     const row=node('div',undefined,'check'+(done?' done':''));row.append(node('i',done?'✓':'○'));const text=node('div',title);text.append(node('small',description));row.append(text);$('checklist').append(row);
   }
   renderTasks();renderReports();renderControls();if(typeof managementRefresh==='function')managementRefresh();
 }
 const providerNames={'deepseek':'DeepSeek','claude-cli':'Claude CLI','gemini-api':'Gemini API','gemini-cli':'Gemini CLI cũ','antigravity-cli':'Antigravity CLI'};
-const defaultModels={'deepseek':'deepseek-flash','gemini-api':'gemini-3.8-flash','antigravity-cli':'','claude-cli':''};
 $('save-settings').onclick=()=>perform('set-mode',{mode:$('mode').value},'Đã lưu chế độ chạy.');
 $('login').onclick=async()=>{if(state.session&&!await confirm('Đăng nhập lại Zalo?','Anh sẽ phải chọn nhóm và ghép chủ lại sau khi đổi tài khoản.'))return;await perform('login',{},'Đã đăng nhập Zalo. Chọn nhóm và ghép chủ để hoàn tất.');};
 $('load-groups').onclick=()=>perform('groups');
-$('save-group').onclick=()=>perform('group',{id:$('group').value},'Đã chọn nhóm.');
+$('save-group').onclick=()=>perform('group',{id:$('group').value},$('group').value==='*'?'Đã chọn: mọi nhóm + tin riêng.':'Đã chọn nhóm.');
 $('pair').onclick=()=>perform('pair',{},'Đã ghép tài khoản chủ.');
 $('cancel').onclick=()=>request('cancel').catch(error=>notice(error.message,true));
-$('start').onclick=async()=>{if(state.config.mode==='live'&&!await confirm('Bật gửi tin thật?','BIMUP Zalo Assistance sẽ gửi tin về nhóm '+(state.config.groupName||state.config.allowedGroupId)+'. Lời chào có thể được tự gửi; các tin cần duyệt sẽ chờ anh.'))return;await perform('start',{confirmLive:true},'Agent đã khởi động.');};
+$('start').onclick=async()=>{if(state.config.mode==='live'&&!await confirm('Bật gửi tin thật?',scopeAll(state.config)?'BIMUP Zalo Assistance sẽ trả lời trong mọi nhóm khi được tag/gọi tên/trả lời tin, và trả lời anh khi anh nhắn riêng. Người khác nhắn riêng sẽ được báo anh; câu cần duyệt sẽ chờ anh.':'BIMUP Zalo Assistance sẽ gửi tin về nhóm '+(state.config.groupName||state.config.allowedGroupId)+'. Lời chào có thể được tự gửi; các tin cần duyệt sẽ chờ anh.'))return;await perform('start',{confirmLive:true},'Agent đã khởi động.');};
 $('stop').onclick=()=>perform('stop',{},'Agent đã dừng.');
 $('pause').onclick=()=>perform('command',{command:state.paused?'resume':'pause'});
 $('resume-ai').onclick=()=>perform('command',{command:'resume-ai'},'Đã cho phép AI chạy lại. Dùng Thử lại cho tin đang review nếu cần.');
 $('open-data').onclick=()=>perform('open-data');
 $('task-filter').onchange=()=>{selected=null;renderTasks();};
-let detailSignature='';
+let detailSignature=null;
 function renderTasks(){const tasks=state.tasks.filter(task=>$('task-filter').value==='all'||task.status===$('task-filter').value);
   $('task-list').replaceChildren();if(!tasks.length)$('task-list').append(node('div','Chưa có tin ở trạng thái này.','empty'));
-  for(const task of tasks){const input=JSON.parse(task.input);const button=node('button',undefined,'task-row'+(selected===task.id?' active':''));button.append(node('span',statuses[task.status]||task.status,'badge'),node('strong',input.text||'(Không có văn bản)'),node('small',task.created+' · '+task.id));button.onclick=()=>{selected=task.id;detailSignature='';renderTasks();};$('task-list').append(button);}
+  for(const task of tasks){const input=JSON.parse(task.input);const button=node('button',undefined,'task-row'+(selected===task.id?' active':''));button.append(node('span',statuses[task.status]||task.status,'badge'),node('strong',input.text||'(Không có văn bản)'),node('small',[whereLabel(input),task.created,task.id].filter(Boolean).join(' · ')));button.onclick=()=>{selected=task.id;detailSignature='';renderTasks();};$('task-list').append(button);}
   const task=state.tasks.find(t=>t.id===selected);const signature=task?JSON.stringify(task):'';if(signature===detailSignature)return;detailSignature=signature;
   $('task-detail').replaceChildren();if(!task){$('task-detail').append(node('div','Chọn một tin trong danh sách để xem nội dung.','empty'));return;}
   const input=JSON.parse(task.input);let decision={};try{decision=JSON.parse(task.decision)||{};}catch{}
-  $('task-detail').append(node('h3',statuses[task.status]||task.status),node('div',task.id+' · '+task.created,'task-meta'),node('h3','Tin nhắn khách'),node('div',input.text,'message'));
-  const label=node('label','Bản nháp trả lời khách'),editor=node('textarea');editor.value=decision.reply||'';editor.disabled=task.status!=='review';label.append(editor);$('task-detail').append(label);
+  $('task-detail').append(node('h3',statuses[task.status]||task.status),node('div',[whereLabel(input),task.id,task.created].filter(Boolean).join(' · '),'task-meta'),node('h3','Tin nhắn khách'),node('div',input.text,'message'));
+  const replyLabel=task.status==='sent'?'Nội dung đã tự động gửi':task.status==='review'?'Bản nháp chờ anh duyệt':'Nội dung câu trả lời';
+  const label=node('label',replyLabel),editor=node('textarea');editor.value=decision.reply||'';editor.disabled=task.status!=='review';label.append(editor);$('task-detail').append(label);
   if(decision.reason)$('task-detail').append(node('p','Lý do: '+decision.reason,'hint'));
   if(decision.report)$('task-detail').append(node('p','Nội bộ: '+decision.report,'hint'));
   const actions=node('div',undefined,'task-actions');

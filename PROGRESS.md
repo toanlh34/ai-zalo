@@ -1,4 +1,11 @@
-# Điểm tiếp tục — 20/10/2026
+# Điểm tiếp tục — 21/10/2026
+
+## Hoạt động đa nhóm & tin riêng thông minh
+
+- Mọi nhóm tham gia (chatScope: all): Javis được thêm vào bất kỳ nhóm nào cũng hoạt động. Chỉ phản hồi khi được @tag, trả lời tin (quote/reply), hoặc gọi tên (Javis/Jarvis/JEV hoặc tên trợ lý). Các tin khác trong nhóm lưu làm ngữ cảnh.
+- Chủ nhắn riêng (kind: owner): Javis trả lời trực tiếp tự nhiên như trợ lý cá nhân, không cần qua duyệt. Các lệnh /jev vẫn thực thi như lệnh quản trị.
+- Người lạ nhắn riêng (kind: dm): Javis báo ngay cho chủ, soạn bản nháp chờ chủ duyệt.
+- Giao diện & Kiểm thử: Hỗ trợ chuyển đổi trên Desktop và CLI; test trong test/everywhere.test.mjs (8/8 pass).
 
 ## Đích đã chốt với anh
 

@@ -8,7 +8,8 @@ MCP này dành cho Codex/AI quản trị **app**, khác với việc cấp MCP t
 - `save_ai_connection`: tạo/sửa tên, provider và model; không nhận API key.
 - `save_assistant`: tạo/sửa tên, tuổi, tính cách, vai trò, skill, AI được gán và chiến lược.
 - `activate_assistant`: chuyển trợ lý khi agent dừng, luôn về thử nháp.
-- `delete_assistant`, `delete_ai_connection`: giữ quy tắc không xóa trợ lý mặc định/đang chọn hoặc AI đang dùng; tài liệu và lịch sử trợ lý vẫn còn trên máy.
+- `delete_assistant`: xóa cấu hình khi agent đã dừng, kể cả trợ lý mặc định cũ hoặc đang chọn. Xóa trợ lý đang chọn sẽ bỏ lựa chọn hiện tại; tài liệu, phiên và lịch sử vẫn còn trên máy.
+- `delete_ai_connection`: xóa kết nối không còn được trợ lý nào dùng, kể cả kết nối mặc định cũ.
 - `list_knowledge`, `read_knowledge`, `write_knowledge`: tài liệu Markdown trong thư mục riêng của từng trợ lý.
 - `test_assistant`: dùng tin giả, có gọi AI và tiêu thụ hạn mức, không gửi Zalo.
 
@@ -26,7 +27,7 @@ Lệnh mẫu để đăng ký thủ công:
 codex mcp add bimup-zalo-assistance -- "<node.exe đã cài kèm app>" "<thư mục cài>/mcp-launcher.cjs"
 ```
 
-Launcher đọc `installation.json` để tìm engine của phiên bản đang cài, không mở trực tiếp SQLite và không tạo một worker Zalo thứ hai. Các thay đổi qua MCP dùng cùng controller với giao diện, hiện ngay trong app. App phải dừng agent trước khi sửa cấu hình hoặc tài liệu.
+Launcher trong bộ cài 0.6.2 dùng engine ngay trong thư mục `resources` bên cạnh nó; launcher của bản cũ vẫn hỗ trợ `installation.json` để tìm thư mục phiên bản. Không mở trực tiếp SQLite và không tạo worker Zalo thứ hai. Các thay đổi qua MCP dùng cùng controller với giao diện, hiện ngay trong app. App phải dừng agent trước khi sửa cấu hình hoặc tài liệu.
 
 Tài liệu cấu hình Codex chính thức: https://learn.chatgpt.com/docs/extend/mcp?surface=cli
 SDK/giao thức: https://modelcontextprotocol.io/docs/develop/build-server

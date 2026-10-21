@@ -10,7 +10,7 @@ export const appTools=[
   tool('get_assistant','Read one assistant profile and its assigned AI connections. No tokens or customer messages.',{id},'get-assistant',true),
   tool('save_assistant','Create an assistant by omitting id, or update an existing profile with id. Set name, age, personality, role, skill, AI IDs and strategy. Does not log in, activate or send messages.',properties,'save-assistant'),
   tool('activate_assistant','Select a saved assistant while the agent is stopped. Switches its private queue and Zalo session; always resets to dry-run. Does not start the agent.',{id},'activate-assistant'),
-  tool('delete_assistant','Delete an inactive assistant configuration. Documents, Zalo session and history remain on disk; default assistant cannot be deleted.',{id},'delete-assistant'),
+  tool('delete_assistant','Delete an assistant configuration while the agent is stopped, including legacy/default or selected profiles. Deleting the selected profile clears selection. Documents, Zalo session and history remain on disk.',{id},'delete-assistant'),
   tool('delete_ai_connection','Delete an unused AI connection. Rejected if any assistant uses it.',{id},'delete-connection'),
   tool('list_knowledge','List Markdown knowledge documents for a specific assistant.',{id},'knowledge-list',true),
   tool('read_knowledge','Read one assistant Markdown knowledge file; basename only, no paths.',{id,filename:z.string().max(100)},'knowledge-read',true),

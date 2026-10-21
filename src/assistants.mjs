@@ -8,9 +8,15 @@ const idOK=id=>/^(legacy-ai|default|[a-f0-9-]{36})$/.test(id);
 const text=(value,max=150)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw Error('Cần nhập tên hoặc nội dung hợp lệ.');return value.trim();};
 export function createAssistantRegistry(root,legacy,legacyZalo={}){
   const file=join(root,'assistants.json');
-  let data=existsSync(file)?JSON.parse(readFileSync(file,'utf8')):{version:1,activeId:'default',connections:[{id:'legacy-ai',name:'AI hiện có',provider:legacy.provider==='gemini-cli'?'antigravity-cli':legacy.provider,model:legacy.provider==='gemini-cli'?'':legacy.model??''}],assistants:[{id:'default',name:'BIMUP',role:'Trợ lý BIMUP',skill:'Dùng quy tắc và kiến thức BIMUP hiện có.',connectionIds:['legacy-ai'],strategy:'primary'}]};
+  const existing=existsSync(file),provider=legacy?.provider==='gemini-cli'?'antigravity-cli':legacy?.provider;
+  // Only a real, explicitly supplied legacy configuration is migrated.
+  // An existing registry, including an empty one, is always authoritative.
+  let data=existing?JSON.parse(readFileSync(file,'utf8')):providers.includes(provider)
+    ?{version:1,activeId:'default',connections:[{id:'legacy-ai',name:'AI hiện có',provider,model:legacy.provider==='gemini-cli'?'':legacy.model??''}],assistants:[{id:'default',name:'BIMUP',role:'Trợ lý BIMUP',skill:'Dùng quy tắc và kiến thức BIMUP hiện có.',connectionIds:['legacy-ai'],strategy:'primary'}]}
+    :{version:1,activeId:null,connections:[],assistants:[]};
   for(const a of data.assistants){a.age??='';a.personality??='';a.platforms??={zalo:a.id==='default'?{allowedGroupId:legacyZalo.allowedGroupId??'',groupName:legacyZalo.groupName??'',ownerUserId:legacyZalo.ownerUserId??''}:{allowedGroupId:'',groupName:'',ownerUserId:''},teams:{tenantId:'',conversationId:''}};}
   const persist=()=>{writeFileSync(file+'.tmp',JSON.stringify(data,null,2));renameSync(file+'.tmp',file);};
+  if(!existing){mkdirSync(root,{recursive:true});persist();}
   const assistant=id=>{const value=data.assistants.find(a=>a.id===id);if(!value)throw Error('Chọn trợ lý hợp lệ.');return value;};
   const connection=id=>{const value=data.connections.find(a=>a.id===id);if(!value)throw Error('Chọn kết nối AI hợp lệ.');return value;};
   const folder=id=>{assistant(id);return id==='default'?root:join(root,'assistants',id);};
@@ -44,10 +50,10 @@ export function createAssistantRegistry(root,legacy,legacyZalo={}){
       persist();return item;
     },
     activate(id){assistant(id);data.activeId=id;persist();},
-    saveZalo(id,config){const a=assistant(id);a.platforms.zalo={allowedGroupId:config.allowedGroupId??'',groupName:config.groupName??'',ownerUserId:config.ownerUserId??''};persist();},
-    removeAssistant(id){if(id==='default'||id===data.activeId)throw Error('Chọn trợ lý khác làm việc trước; không xóa trợ lý mặc định.');assistant(id);data.assistants=data.assistants.filter(a=>a.id!==id);persist();},
-    removeConnection(id){connection(id);if(id==='legacy-ai'||data.assistants.some(a=>a.connectionIds.includes(id)))throw Error('Cần gỡ AI khỏi các trợ lý trước khi xóa; kết nối mặc định được giữ lại.');data.connections=data.connections.filter(c=>c.id!==id);persist();},
-    config(id){const c=connection(id);return {provider:c.provider,model:c.model,executable:c.provider==='antigravity-cli'?'agy':'claude',apiKeyEnv:c.provider==='gemini-api'?'GEMINI_API_KEY':'DEEPSEEK_API_KEY',timeoutMs:120000,mcpServers:{},allowedMcpTools:[]};},
+    saveZalo(id,config){const a=assistant(id);a.platforms.zalo={allowedGroupId:config.allowedGroupId??'',groupName:config.groupName??'',ownerUserId:config.ownerUserId??'',...(['all','single'].includes(config.chatScope)?{chatScope:config.chatScope}:{})};persist();},
+    removeAssistant(id){assistant(id);data.assistants=data.assistants.filter(a=>a.id!==id);if(id===data.activeId)data.activeId=null;persist();},
+    removeConnection(id){connection(id);if(data.assistants.some(a=>a.connectionIds.includes(id)))throw Error('Cần gỡ AI khỏi các trợ lý trước khi xóa.');data.connections=data.connections.filter(c=>c.id!==id);persist();},
+    config(id){const c=connection(id);return {provider:c.provider,model:c.model,executable:c.provider==='antigravity-cli'?'agy':'claude',apiKeyEnv:c.provider==='gemini-api'?'GEMINI_API_KEY':'DEEPSEEK_API_KEY',timeoutMs:120000,mcpServers:{},allowedMcpTools:[],enableTools:c.provider==='antigravity-cli'};},
     persist
   };
 }

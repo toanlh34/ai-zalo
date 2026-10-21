@@ -21,7 +21,7 @@ async function shutdown(){
 }
 try{
   const [command='run',...args]=process.argv.slice(2);
-  if(command==='help'||command==='--help'||args.includes('--help'))console.log(`${usage}\nrun --live: bật trả lời nhóm đã cấu hình; run --dry-run: chỉ tạo bản nháp.`);
+  if(command==='help'||command==='--help'||args.includes('--help'))console.log(`${usage}\nrun --live: bật trả lời (mọi nhóm khi được gọi + tin riêng, hoặc nhóm đã cấu hình); run --dry-run: chỉ tạo bản nháp.`);
   else{
     secureDirectory(dir);
     if(command==='run')releaseLock=acquireLock(join(dir,'worker.lock'));
@@ -34,7 +34,7 @@ try{
       try{config=JSON.parse(readFileSync(join(root,'config.json'),'utf8'));}catch{throw Error('Cần chạy npm run setup để đăng nhập và chọn nhóm/chủ trước');}
       if(args.includes('--live'))config.mode='live';
       if(args.includes('--dry-run'))config.mode='dry-run';
-      if(!/^\d+$/.test(config.allowedGroupId??'')||!/^\d+$/.test(config.ownerUserId??''))throw Error('Cần chạy npm run setup để chọn đúng nhóm và chủ');
+      if(!/^\d+$/.test(config.ownerUserId??''))throw Error('Cần chạy npm run setup để ghép đúng tài khoản chủ');
       validateRuntimeConfig(config);
       const agent=createAgent(config.ai??{},root);
       let session;try{session=loadSession(dir);}catch{throw Error('Cần đăng nhập Zalo: npm run setup');}

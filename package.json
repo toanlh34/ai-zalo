@@ -1,6 +1,6 @@
 {
   "name": "zalo-local-assistant",
-  "version": "0.6.1",
+  "version": "0.6.3",
   "private": true,
   "type": "module",
   "main": "desktop/main.cjs",
@@ -9,6 +9,7 @@
   "scripts": {
     "desktop": "node scripts/prepare-desktop.mjs && electron .",
     "build:desktop": "node scripts/prepare-desktop.mjs --stage && electron-builder --win portable --x64 --publish never",
+    "build:installer": "node scripts/prepare-desktop.mjs --stage && electron-builder --win nsis --x64 --publish never",
     "test:desktop": "node scripts/prepare-desktop.mjs && node scripts/desktop-smoke.cjs",
     "start": "node src/jev.mjs run",
     "agent": "node src/jev.mjs run",
@@ -33,6 +34,7 @@
   "build": {
     "appId": "vn.bimup.jev",
     "productName": "BIMUP Zalo Assistance",
+    "compression": "normal",
     "directories": {
       "output": "release",
       "app": "desktop"
@@ -45,6 +47,11 @@
       "renderer.js",
       "management.js",
       "package.json"
+    ],
+    "extraFiles": [
+      { "from": "HUONG-DAN-SU-DUNG.html", "to": "HUONG-DAN-SU-DUNG.html" },
+      { "from": "HUONG-DAN-SU-DUNG.md", "to": "HUONG-DAN-SU-DUNG.md" },
+      { "from": "scripts/mcp-launcher.cjs", "to": "mcp-launcher.cjs" }
     ],
     "extraResources": [
       {
@@ -67,11 +74,26 @@
       }
     ],
     "win": {
-      "target": "portable",
+      "target": ["nsis", "portable"],
       "signAndEditExecutable": false
     },
     "portable": {
       "artifactName": "BIMUP-Zalo-Assistance-${version}-Windows.exe"
+    },
+    "nsis": {
+      "artifactName": "BIMUP-Zalo-Assistance-Setup-${version}.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BIMUP Zalo Assistance",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "packElevateHelper": false,
+      "installerLanguages": ["vi_VN"],
+      "language": "1066"
     },
     "npmRebuild": false
   },

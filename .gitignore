@@ -7,3 +7,10 @@ config.json.*.tmp
 .desktop-engine/
 release/
 desktop-test-artifacts/
+.npm-cache/
+.electron-cache/
+.electron-builder-cache/
+.test-temp/
+.controller-test-temp/
+.maintenance-backups/
+.installer-test/

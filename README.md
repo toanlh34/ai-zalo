@@ -1,3 +1,5 @@
+> Bản 0.6.2 có bộ cài Windows tiếng Việt, hướng dẫn dùng ngoại tuyến và không tạo sẵn trợ lý/kết nối AI. Xem [hướng dẫn sử dụng](HUONG-DAN-SU-DUNG.md).
+
 > Bản 0.6.1 bổ sung [MCP quản trị app](MCP.vi.md): tạo/sửa trợ lý, gán AI và quản lý kiến thức từ Codex.
 
 > Bản 0.5.0: **Thiết lập AI** quản lý model/key; **Trợ lý** quản lý hồ sơ, skill và kết nối Zalo riêng. [Hướng dẫn mới](ASSISTANTS.vi.md).
@@ -10,7 +12,7 @@
 
 ## App Windows
 
-Đã có giao diện desktop để xem trạng thái, chọn AI, lưu key, quét QR, chọn nhóm, ghép chủ, bật/dừng và duyệt bản nháp. Mở `release/BIMUP-Zalo-Assistance-0.6.1-Windows.exe`; không cần terminal để vận hành. Xem [hướng dẫn app Windows](DESKTOP.vi.md). Đóng cửa sổ sẽ dừng agent. Các lệnh bên dưới vẫn dành cho cách chạy CLI.
+Chạy `release/BIMUP-Zalo-Assistance-Setup-0.6.2.exe` để cài, rồi mở **BIMUP Zalo Assistance** ngoài Desktop hoặc Start Menu. Không cần cài Node.js hoặc dùng terminal để vận hành app. Xem [hướng dẫn sử dụng](HUONG-DAN-SU-DUNG.md). Đóng cửa sổ sẽ dừng agent. Các lệnh bên dưới dành cho cách chạy CLI.
 
 ## Bổ sung DeepSeek
 
