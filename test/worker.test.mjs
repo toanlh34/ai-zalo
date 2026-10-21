@@ -36,8 +36,8 @@ test('tin tiếp theo thấy câu JEV đã gửi, không đưa các tin tương 
   assert.ok(x.requests[1].context.every(m=>m.id!=='2'));
 });
 
-test('hết hạn mức chỉ gọi AI một lần, giữ tin sau trong hàng chờ kể cả worker mới',async t=>{
-  const x=setup({},Object.assign(Error('quota'),{code:'CLAUDE_RATE_LIMITED'}));t.after(()=>x.store.close());
+for(const code of ['CLAUDE_RATE_LIMITED','AI_RATE_LIMITED'])test(`${code}: hết hạn mức chỉ gọi AI một lần, giữ tin sau trong hàng chờ kể cả worker mới`,async t=>{
+  const x=setup({},Object.assign(Error('quota'),{code}));t.after(()=>x.store.close());
   x.add();x.store.add('123:2','123',{id:'2',sender:'9',text:'xin chào'});
   await x.worker.tick();await x.worker.tick();
   assert.equal(x.calls,1);assert.equal(x.store.aiPaused(),true);assert.equal(x.store.get('123:2').status,'queued');

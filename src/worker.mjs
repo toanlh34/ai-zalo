@@ -26,8 +26,8 @@ export function createWorker({store,agent,config,send,pausePath}) {
               const text=`${input.truncated?'Tin nhắn đã bị rút gọn; cần xem bản đầy đủ trên Zalo.\n':''}${auto?'JEV đề xuất tự gửi':'Cần anh tham gia'}: ${decision.report}\nLý do: ${decision.reason}\nBản nháp: ${decision.reply}`;
               if(store.decision(task.id,decision,auto?'approved':'review',{report:text}))logReport(task.id,text);
             }catch(error){
-              if(error?.code==='CLAUDE_RATE_LIMITED') {
-                const text='Claude hết hạn mức. Đã tạm dừng gọi AI; khi có hạn mức, dùng resume-ai rồi retry task cần xử lý lại.';
+              if(['CLAUDE_RATE_LIMITED','AI_RATE_LIMITED'].includes(error?.code)) {
+                const text='AI hết hạn mức hoặc số dư. Đã tạm dừng gọi AI; khi có hạn mức, dùng resume-ai rồi retry task cần xử lý lại.';
                 if(store.pauseAi(task.id,text))logReport(task.id,text);
               } else transition(task.id,'thinking','review',stopped?'Agent đã dừng khi đang xử lý; chưa gửi khách.':'AI lỗi hoặc trả dữ liệu sai. Cần anh kiểm tra.');
             }

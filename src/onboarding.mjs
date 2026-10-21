@@ -50,7 +50,9 @@ export function setupConfig(template,groupId,ownerUserId){
   createInbox(groupId,template.contextLimit??30);
   validateQueueLimit(template.maxPendingTasks??100);
   if(!/^\d+$/.test(ownerUserId))throw Error('Chủ không hợp lệ');
-  return {...template,allowedGroupId:groupId,ownerUserId,mode:'dry-run',autoSendCategories:template.autoSendCategories??['greeting'],ai:{...template.ai,provider:'claude-cli'}};
+  const provider=template.ai?.provider??'claude-cli';
+  if(!['claude-cli','deepseek','gemini-api','gemini-cli','antigravity-cli'].includes(provider))throw Error('Cần chọn provider AI hợp lệ.');
+  return {...template,allowedGroupId:groupId,ownerUserId,mode:'dry-run',autoSendCategories:template.autoSendCategories??['greeting'],ai:{...template.ai,provider}};
 }
 export async function configureAgent({api,template,ask,log=console.log,onCode,signal}){
   let groups=await listGroups(api);

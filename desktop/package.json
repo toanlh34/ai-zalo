@@ -1,0 +1,8 @@
+{
+  "name": "jev-bimup-desktop",
+  "version": "0.6.0",
+  "main": "main.cjs",
+  "private": true,
+  "description": "BIMUP Zalo Assistance",
+  "author": "BIMUP"
+}

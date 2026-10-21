@@ -8,9 +8,10 @@ import {secureDirectory,loadSession} from './session.mjs';
 import {acquireLock} from './lock.mjs';
 import {loginWithQR} from './zalo-login.mjs';
 import {configureAgent,saveConfig} from './onboarding.mjs';
+import {GEMINI_MODEL} from './gemini.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-if(process.argv.includes('--help'))console.log('npm run setup: đăng nhập QR tài khoản agent, chọn nhóm, ghép chủ qua tin riêng. Chỉ lưu cấu hình dry-run; không gọi Claude hoặc gửi tin.');
+if(process.argv.includes('--help'))console.log('npm run setup: chọn Claude CLI, DeepSeek, Gemini API hoặc Antigravity CLI; đăng nhập QR, chọn nhóm và ghép chủ qua tin riêng. Chỉ lưu cấu hình dry-run; không gọi AI hoặc gửi tin.');
 else{
   let releaseLock,rl,api;
   const controller=new AbortController(),interrupt=()=>controller.abort();
@@ -22,6 +23,12 @@ else{
     const ask=prompt=>rl.question(prompt,{signal:controller.signal});
     const configPath=join(root,'config.json');
     const template=JSON.parse(readFileSync(existsSync(configPath)?configPath:join(root,'config.example.json'),'utf8'));
+    let provider;
+    while(!['claude-cli','deepseek','gemini-api','antigravity-cli'].includes(provider))provider=(await ask(`Chọn AI: claude-cli, deepseek, gemini-api hoặc antigravity-cli [${template.ai?.provider??'claude-cli'}]: `)).trim()||template.ai?.provider||'claude-cli';
+    template.ai={...template.ai,provider,model:provider===template.ai?.provider?template.ai?.model??'':provider==='deepseek'?'deepseek-flash':provider==='gemini-api'?GEMINI_MODEL:'',executable:provider==='antigravity-cli'?'agy':'claude',apiKeyEnv:provider==='gemini-api'?'GEMINI_API_KEY':'DEEPSEEK_API_KEY'};
+    if(provider==='deepseek')console.log('Đặt DEEPSEEK_API_KEY trong môi trường trước khi chạy agent. Không nhập key vào chat hoặc config.');
+    if(provider==='gemini-api')console.log('Đặt GEMINI_API_KEY trước khi chạy agent. Không nhập key vào chat hoặc config.');
+    if(provider==='antigravity-cli')console.log('Cần cài Antigravity CLI và đăng nhập Google trên máy trước khi chạy agent.');
     const {Zalo,LoginQRCallbackEventType}=await import('zca-js');
     const zalo=new Zalo({selfListen:false,logging:false,checkUpdate:false});
     if(existsSync(join(dir,'session.dpapi'))){
@@ -37,7 +44,7 @@ else{
     }});
     const config=await configureAgent({api,template,ask,signal:controller.signal,onCode:code=>console.log(`/jev pair ${code}\nMã dùng một lần, hết hạn sau 5 phút. Không chia sẻ mã hoặc QR.`)});
     saveConfig(configPath,config);
-    console.log('Đã thiết lập agent với Claude CLI.\nThử không gửi: npm run agent -- --dry-run\nBật trả lời nhóm đã chọn: npm run agent -- --live\nChủ điều khiển trong tin riêng bằng /jev help.');
+    console.log(`Đã thiết lập agent với ${config.ai.provider}.\nThử không gửi: npm run agent -- --dry-run\nBật trả lời nhóm đã chọn: npm run agent -- --live\nChủ điều khiển trong tin riêng bằng /jev help.`);
   }catch(error){console.error(error.code==='EEXIST'?'Agent hoặc setup đang chạy. Kiểm tra worker.lock trước khi chạy lại.':'Setup chưa hoàn tất. Kiểm tra phiên/QR, kết nối và nhóm; có thể chạy lại npm run setup.');process.exitCode=1;}
   finally{try{api?.listener.stop();}catch{}rl?.close();releaseLock?.();process.off('SIGINT',interrupt);process.off('SIGTERM',interrupt);}
 }

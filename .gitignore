@@ -3,3 +3,7 @@ node_modules/
 config.json
 config.json.*.tmp
 *.log
+.desktop-runtime/
+.desktop-engine/
+release/
+desktop-test-artifacts/

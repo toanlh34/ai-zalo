@@ -1,6 +1,47 @@
-# JEV — agent trong Zalo
+> Bản 0.5.0: **Thiết lập AI** quản lý model/key; **Trợ lý** quản lý hồ sơ, skill và kết nối Zalo riêng. [Hướng dẫn mới](ASSISTANTS.vi.md).
 
-JEV chạy trên PC Windows, dùng Claude CLI đã đăng nhập để đọc tin nhóm, soạn trả lời và báo chủ qua tin riêng. Chủ duyệt hoặc điều khiển ngay trong Zalo. Hiện đã xây luồng thiết lập/chạy; **chưa online vì tài khoản Zalo agent sẽ được đăng ký sau**. Chưa xác minh Claude và Zalo thật trả lời thành công cùng nhau.
+> Bản 0.4.0: đã thêm cửa sổ [Trợ lý & AI](ASSISTANTS.vi.md), hỗ trợ gán nhiều AI và dùng chung kết nối.
+
+# BIMUP Zalo Assistance
+
+**Phiên bản 0.3.0:** đã tích hợp Antigravity CLI cho tài khoản Google và nút thử kết nối AI. Xem [cách dùng Antigravity](ANTIGRAVITY.vi.md).
+
+## App Windows
+
+Đã có giao diện desktop để xem trạng thái, chọn AI, lưu key, quét QR, chọn nhóm, ghép chủ, bật/dừng và duyệt bản nháp. Mở `release/BIMUP-Zalo-Assistance-0.5.0-Windows.exe`; không cần terminal để vận hành. Xem [hướng dẫn app Windows](DESKTOP.vi.md). Đóng cửa sổ sẽ dừng agent. Các lệnh bên dưới vẫn dành cho cách chạy CLI.
+
+## Bổ sung DeepSeek
+
+JEV hỗ trợ hai provider: `claude-cli` (giữ cách đăng nhập cũ) và `deepseek` (API key riêng). Khi `npm run setup`, chọn `deepseek`; setup vẫn lưu mode=dry-run. Xem [cấu trúc chương trình](ARCHITECTURE.vi.md) để hiểu vai trò Zalo, chương trình trên PC và AI.
+
+Lần cài đầu cần Node.js >=22 và chạy `npm ci --ignore-scripts`. Trong PowerShell 7, nhập key ẩn vào môi trường của terminal đang chạy, không viết key vào lệnh hoặc file config:
+
+```powershell
+$env:DEEPSEEK_API_KEY = Read-Host 'DeepSeek API key' -MaskInput
+npm run setup
+npm run agent -- --dry-run
+```
+
+Biến chỉ tồn tại trong phiên terminal này; mở terminal mới cần nhập lại. Sau khi xem nháp (`npm run jev -- reports`), Ctrl+C rồi `npm run agent -- --live` để bật gửi. Tin nhóm và tài liệu `knowledge/` sẽ gửi đến DeepSeek khi dùng provider này, kể cả dry-run. API cần key và số dư; không dùng phiên đăng nhập web DeepSeek.
+
+Nếu đã setup Zalo trước đó, có thể sửa riêng phần `ai` trong `config.json` thành:
+
+```json
+{
+  "provider": "deepseek",
+  "model": "deepseek-flash",
+  "apiKeyEnv": "DEEPSEEK_API_KEY",
+  "timeoutMs": 120000,
+  "mcpServers": {},
+  "allowedMcpTools": []
+}
+```
+
+Đây là giá trị của trường `ai`, không thay toàn bộ config (cần giữ ID nhóm/chủ và mode). DeepSeek hiện chỉ dùng tin văn bản và tài liệu, chưa hỗ trợ MCP. HTTP 402/429 tạm dừng AI và giữ task để chủ xử lý; có số dư/hạn mức trở lại thì dùng `/jev resume-ai`, rồi `/jev retry <id>` nếu cần. Bản nháp sai JSON hoặc lỗi mạng chuyển review và không gửi khách.
+
+Endpoint/model theo [tài liệu DeepSeek](https://api-docs.deepseek.com/). Adapter dùng JSON output và kiểm tra lại quyết định trong chương trình. Các test DeepSeek giả lập HTTP; chưa xác minh API thật nếu chưa có key.
+
+JEV chạy trên PC Windows, dùng Claude CLI đã đăng nhập hoặc DeepSeek API để đọc tin nhóm, soạn trả lời và báo chủ qua tin riêng. Chủ duyệt hoặc điều khiển ngay trong Zalo. Hiện đã xây luồng thiết lập/chạy; **chưa online vì tài khoản Zalo agent sẽ được đăng ký sau**. Chưa xác minh AI và Zalo thật trả lời thành công cùng nhau.
 
 ## Khi đã có tài khoản Zalo riêng
 
@@ -85,3 +126,5 @@ Xem [báo cáo kiểm thử](reports/OFFLINE_TEST_REPORT.md) và [điểm tiếp
 `npm run listen` là bản listener chỉ nhận tin ban đầu. `npm run login` / `groups` là công cụ QR/danh sách nhóm riêng; luồng agent chính là setup → agent, không cần sửa ID bằng tay.
 
 Đã cài theo package-lock.json với `npm ci --ignore-scripts`; zca-js@2.1.2. Đã kiểm thử trên Node.js 24.15.0, Windows. Thư viện Zalo là zca-js không chính thức; trạng thái nhận/gửi thật chỉ được xác minh khi đăng nhập tài khoản của anh và thử trong nhóm riêng.
+
+Khảo sát mở rộng Teams: [phương án và các bước triển khai](TEAMS_RESEARCH.vi.md). Teams chưa nằm trong bản 0.3.0.

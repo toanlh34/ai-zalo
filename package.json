@@ -1,9 +1,77 @@
 {
   "name": "zalo-local-assistant",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/jev.mjs run", "agent": "node src/jev.mjs run", "setup": "node src/setup.mjs", "listen": "node src/main.mjs", "login": "node src/main.mjs login", "groups": "node src/main.mjs groups", "jev": "node src/jev.mjs", "smoke": "node --import ./scripts/offline-guard.mjs --test test/integration.test.mjs test/runtime.test.mjs test/onboarding.test.mjs", "smoke:claude": "node src/smoke.mjs", "test": "node --import ./scripts/offline-guard.mjs --test", "test:offline": "node --import ./scripts/offline-guard.mjs --test" },
-  "engines": { "node": ">=22" },
-  "dependencies": { "zca-js": "2.1.2" }
+  "main": "desktop/main.cjs",
+  "description": "BIMUP Zalo Assistance",
+  "author": "BIMUP",
+  "scripts": {
+    "desktop": "node scripts/prepare-desktop.mjs && electron .",
+    "build:desktop": "node scripts/prepare-desktop.mjs --stage && electron-builder --win portable --x64 --publish never",
+    "test:desktop": "node scripts/prepare-desktop.mjs && node scripts/desktop-smoke.cjs",
+    "start": "node src/jev.mjs run",
+    "agent": "node src/jev.mjs run",
+    "setup": "node src/setup.mjs",
+    "listen": "node src/main.mjs",
+    "login": "node src/main.mjs login",
+    "groups": "node src/main.mjs groups",
+    "jev": "node src/jev.mjs",
+    "smoke": "node --import ./scripts/offline-guard.mjs --test test/integration.test.mjs test/runtime.test.mjs test/onboarding.test.mjs",
+    "smoke:claude": "node src/smoke.mjs",
+    "test": "node --import ./scripts/offline-guard.mjs --test",
+    "test:offline": "node --import ./scripts/offline-guard.mjs --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zca-js": "2.1.2",
+    "zod": "3.25.76"
+  },
+  "build": {
+    "appId": "vn.bimup.jev",
+    "productName": "BIMUP Zalo Assistance",
+    "directories": {
+      "output": "release",
+      "app": "desktop"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "index.html",
+      "styles.css",
+      "renderer.js",
+      "management.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".desktop-runtime",
+        "to": "runtime",
+        "filter": [
+          "node.exe"
+        ]
+      },
+      {
+        "from": ".desktop-engine",
+        "to": "engine"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "BIMUP-Zalo-Assistance-${version}-Windows.exe"
+    },
+    "npmRebuild": false
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "npm": "^12.2.0",
+    "playwright": "^1.64.1"
+  }
 }

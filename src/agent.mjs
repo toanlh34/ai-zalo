@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, extname, resolve, relative, isAbsolute } from 'node:path';
+import {createDeepSeekAgent} from './deepseek.mjs';
+import {createGeminiApiAgent,createGeminiCliAgent} from './gemini.mjs';
+import {createAntigravityAgent} from './antigravity.mjs';
 
 export const schema = { type:'object', additionalProperties:false, properties:{ action:{type:'string',enum:['send','escalate']}, category:{type:'string',enum:['greeting','documented_answer','other']}, reply:{type:'string'}, reason:{type:'string'}, report:{type:'string'} }, required:['action','category','reply','reason','report'] };
 export function validateDecision(d) {
@@ -70,14 +73,19 @@ export function resolveCliCommand(executable='claude', {platform=process.platfor
   }
   return {command:executable,args:[]};
 }
-export function createAgent(config, root) {
+export function createAgent(config, root, dependencies={}) {
+  if(config.provider==='antigravity-cli')return createAntigravityAgent(config,root,{loadContext,validateDecision,schema,...dependencies});
+  if(config.provider==='gemini-api')return createGeminiApiAgent(config,root,{loadContext,validateDecision,schema,...dependencies});
+  if(config.provider==='gemini-cli'&&!dependencies.allowLegacyGeminiCli)throw Error('Cần chọn Gemini API hoặc AI khác: Google đã ngừng đăng nhập Gemini CLI bằng tài khoản cá nhân/AI Pro. Hãy chọn Antigravity CLI trong Thiết lập để dùng tài khoản Google.');
+  if(config.provider==='gemini-cli')return createGeminiCliAgent(config,root,{loadContext,validateDecision,schema,...dependencies});
+  if(config.provider==='deepseek')return createDeepSeekAgent(config,root,{loadContext,validateDecision,schema,...dependencies});
   if(config.provider!=='claude-cli') throw Error('Provider chưa được triển khai');
   return { async decide(input,{signal}={}) {
     if(signal?.aborted)throw providerError('CLAUDE_CANCELLED','Claude request cancelled');
-    const env={...process.env};
+    const env={...(dependencies.env??process.env)};
     // Use the existing CLI subscription login only. Never read or copy OAuth tokens.
     for(const key of Object.keys(env)) if(/^ANTHROPIC_|^CLAUDE_CODE_USE_|^CLAUDECODE$/.test(key))delete env[key];
-    const instructions=loadContext(root);
+    const instructions=(dependencies.loadContext??loadContext)(root);
     const cwd=join(root,'agent');
     const command=resolveCliCommand(config.executable||'claude',{env,cwd});
     return await new Promise((resolve,reject)=>{

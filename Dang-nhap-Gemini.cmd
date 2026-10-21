@@ -1,0 +1,4 @@
+@echo off
+title Dang nhap Gemini - Khong tu dong dong
+powershell.exe -NoLogo -NoProfile -NoExit -Command "$ErrorActionPreference = 'Stop'; $env:TERM = 'xterm-256color'; $env:COLORTERM = 'truecolor'; $env:PATH = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User'); $node = Join-Path $env:LOCALAPPDATA 'Programs\NodeJS\node-v24.20.0-win-x64\node.exe'; $cli = Join-Path $env:APPDATA 'npm\node_modules\@google\gemini-cli\bundle\gemini.js'; $loginDir = Join-Path $env:LOCALAPPDATA 'JEV\GeminiLogin'; New-Item -ItemType Directory -Path $loginDir -Force | Out-Null; Set-Location -LiteralPath $loginDir; if (!(Test-Path -LiteralPath $node) -or !(Test-Path -LiteralPath $cli)) { Write-Host 'Khong tim thay Gemini CLI. Giu cua so nay de kiem tra.' -ForegroundColor Red } else { & $node $cli; Write-Host ('Gemini da ket thuc. Ma thoat: ' + $LASTEXITCODE) -ForegroundColor Yellow }"
+pause
