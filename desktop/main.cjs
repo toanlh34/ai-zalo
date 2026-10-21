@@ -4,8 +4,12 @@ const {createInterface}=require('node:readline');
 const fs=require('node:fs');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
-let mcpError=null,bridge,window,child,ready=false,quitting=false,counter=0;
+let startupError='',mcpError=null,mcpEnabled=false,window,child,ready=false,quitting=false,counter=0;
 const pending=new Map();
+// Bind the singleton lock to this data directory before claiming it. Test/profile
+// windows must not redirect to an unrelated running production instance.
+const data=process.env.JEV_DESKTOP_DATA||path.join(app.getPath('appData'),app.isPackaged?'jev-bimup-desktop':'zalo-local-assistant');
+fs.mkdirSync(data,{recursive:true});app.setPath('userData',data);
 if(!app.requestSingleInstanceLock()){app.quit();}else{
 app.on('second-instance',()=>{window?.show();window?.focus();});
 app.whenReady().then(async()=>{
@@ -13,9 +17,6 @@ app.whenReady().then(async()=>{
   // Resolve Windows short paths before ESM imports (portable extraction uses 8.3 paths).
   const source=fs.realpathSync.native(app.isPackaged?path.join(process.resourcesPath,'engine'):path.join(__dirname,'..'));
   // Preserve the existing data location when changing the visible product name.
-  const data=process.env.JEV_DESKTOP_DATA||path.join(app.getPath('appData'),app.isPackaged?'jev-bimup-desktop':'zalo-local-assistant');
-  app.setPath('userData',data);
-  fs.mkdirSync(data,{recursive:true});
   const secretPath=path.join(data,'deepseek-key.bin');
   const geminiSecretPath=path.join(data,'gemini-key.bin');
   const vaultPath=path.join(data,'ai-connections.bin');
@@ -33,7 +34,7 @@ app.whenReady().then(async()=>{
   const emit=(event,data)=>{if(!window.isDestroyed())window.webContents.send('jev:event',{event,data});};
   function request(action,payload){
     return new Promise((resolve,reject)=>{
-      if(!ready&&action!=='shutdown'){reject(Error('Bộ máy đang khởi động. Thử lại sau vài giây.'));return;}
+      if(!ready&&action!=='shutdown'){reject(Error(startupError||'Bộ máy đang khởi động. Thử lại sau vài giây.'));return;}
       const id=++counter;pending.set(id,{resolve,reject});
       child.stdin.write(JSON.stringify({id,action,payload})+'\n',error=>{if(error){pending.delete(id);reject(Error('Bộ máy đã dừng.'));}});
     });
@@ -42,11 +43,19 @@ app.whenReady().then(async()=>{
     env:{...process.env,JEV_AI_KEYS:JSON.stringify(profileKeys),JEV_DATA_ROOT:data,JEV_SOURCE_ROOT:source,DEEPSEEK_API_KEY:key||process.env.DEEPSEEK_API_KEY||'',GEMINI_API_KEY:geminiKey||process.env.GEMINI_API_KEY||''}});
   createInterface({input:child.stdout}).on('line',line=>{
     let value;try{value=JSON.parse(line);}catch{return;}
-    if(value.event==='ready')ready=true;
-    if(value.id){const call=pending.get(value.id);if(call){pending.delete(value.id);value.error?call.reject(Error(value.error)):call.resolve(value.result);}}
+    if(value.event==='ready'){ready=true;mcpEnabled=!!value.mcpEnabled;mcpError=value.mcpError??null;}
+    if(value.event==='mcp-request'){
+      const call=value.data;
+      handleAction(call.action,call.payload).then(result=>child.stdin.write(JSON.stringify({event:'mcp-response',id:call.id,result})+'\n')).catch(error=>child.stdin.write(JSON.stringify({event:'mcp-response',id:call.id,error:error.message,errorCode:error.code})+'\n'));return;
+    }
+    if(value.id){const call=pending.get(value.id);if(call){pending.delete(value.id);value.error?call.reject(Object.assign(Error(value.error),{code:value.errorCode})):call.resolve(value.result);}}
     else emit(value.event,value.data);
   });
-  child.stderr.on('data',()=>{});
+  child.stderr.on('data',chunk=>{
+    if(ready)return;
+    const missing=String(chunk).match(/Cannot find (?:package|module) ['"]([^'"\r\n]+)['"]/);
+    if(missing)startupError='Thiếu mô-đun khởi động: '+missing[1];
+  });
   child.on('error',()=>emit('fatal','Không khởi động được bộ máy Node. Hãy build lại app.'));
   child.on('exit',()=>{ready=false;for(const call of pending.values())call.reject(Error('Bộ máy đã dừng. Mở lại ứng dụng.'));pending.clear();if(!quitting)emit('fatal','Bộ máy đã dừng. Đóng và mở lại app để phục hồi.');});
   async function handleAction(action,payload={}){
@@ -83,7 +92,7 @@ app.whenReady().then(async()=>{
     if(action==='open-data'){await shell.openPath(data);return;}
     if(action==='open-knowledge'){const state=await request('snapshot');const folder=await request('assistant-folder',{id:state.management.activeId});await shell.openPath(path.join(folder,'knowledge'));return;}
     const result=await request(action,payload);
-    if(action==='snapshot')return {...result,management:{...result.management,connections:result.management.connections.map(c=>({...c,keySaved:c.id==='legacy-ai'?fs.existsSync(c.provider==='gemini-api'?geminiSecretPath:secretPath):c.keySaved}))},keySaved:fs.existsSync(secretPath),geminiKeySaved:fs.existsSync(geminiSecretPath),dataRoot:data,mcp:{enabled:!!bridge,localOnly:true,errorCode:mcpError}};
+    if(action==='snapshot')return {...result,management:{...result.management,connections:result.management.connections.map(c=>({...c,keySaved:c.id==='legacy-ai'?fs.existsSync(c.provider==='gemini-api'?geminiSecretPath:secretPath):c.keySaved}))},keySaved:fs.existsSync(secretPath),geminiKeySaved:fs.existsSync(geminiSecretPath),dataRoot:data,mcp:{enabled:mcpEnabled,localOnly:true,errorCode:mcpError}};
     if(action==='delete-connection'&&profileKeys[payload.id]){delete profileKeys[payload.id];fs.writeFileSync(vaultPath,safeStorage.encryptString(JSON.stringify(profileKeys)));}
     return result;
   }
@@ -91,14 +100,10 @@ app.whenReady().then(async()=>{
     if(event.sender!==window.webContents||event.senderFrame!==window.webContents.mainFrame||event.senderFrame.url!==window.webContents.getURL())throw Error('Invalid sender');
     return handleAction(action,payload);
   });
-  try{
-    const {startAppBridge}=await import(pathToFileURL(fs.realpathSync.native(path.join(source,'src','app-mcp-bridge.mjs'))).href);
-    bridge=await startAppBridge({dataRoot:data,dispatch:handleAction,onCall:name=>{emit('log','MCP quản trị: '+name);emit('state');}});emit('state');
-  }catch(error){mcpError=error.code||'MCP_START_FAILED';emit('log','MCP quản trị chưa khởi động được: '+mcpError);}
   app.on('before-quit',event=>{
     if(quitting)return;event.preventDefault();quitting=true;
     emit('log','Đang dừng agent trước khi đóng ứng dụng…');
-    Promise.resolve(bridge?.close()).then(()=>request('shutdown')).then(()=>app.quit()).catch(()=>app.quit());
+    request('shutdown').then(()=>app.quit()).catch(()=>app.quit());
   });
   window.on('close',event=>{if(!quitting){event.preventDefault();app.quit();}});
 });

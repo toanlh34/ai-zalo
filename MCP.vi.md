@@ -1,4 +1,4 @@
-# MCP quản trị BIMUP Zalo Assistance — 0.6.0
+# MCP quản trị BIMUP Zalo Assistance — 0.6.1
 
 MCP này dành cho Codex/AI quản trị **app**, khác với việc cấp MCP tool cho Antigravity khi trả lời khách. Antigravity vẫn dùng hồ sơ soạn nháp không có tool/MCP.
 

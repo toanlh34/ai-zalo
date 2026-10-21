@@ -1,3 +1,5 @@
+> Bản 0.6.1 bổ sung [MCP quản trị app](MCP.vi.md): tạo/sửa trợ lý, gán AI và quản lý kiến thức từ Codex.
+
 > Bản 0.5.0: **Thiết lập AI** quản lý model/key; **Trợ lý** quản lý hồ sơ, skill và kết nối Zalo riêng. [Hướng dẫn mới](ASSISTANTS.vi.md).
 
 > Bản 0.4.0: đã thêm cửa sổ [Trợ lý & AI](ASSISTANTS.vi.md), hỗ trợ gán nhiều AI và dùng chung kết nối.
@@ -8,7 +10,7 @@
 
 ## App Windows
 
-Đã có giao diện desktop để xem trạng thái, chọn AI, lưu key, quét QR, chọn nhóm, ghép chủ, bật/dừng và duyệt bản nháp. Mở `release/BIMUP-Zalo-Assistance-0.5.0-Windows.exe`; không cần terminal để vận hành. Xem [hướng dẫn app Windows](DESKTOP.vi.md). Đóng cửa sổ sẽ dừng agent. Các lệnh bên dưới vẫn dành cho cách chạy CLI.
+Đã có giao diện desktop để xem trạng thái, chọn AI, lưu key, quét QR, chọn nhóm, ghép chủ, bật/dừng và duyệt bản nháp. Mở `release/BIMUP-Zalo-Assistance-0.6.1-Windows.exe`; không cần terminal để vận hành. Xem [hướng dẫn app Windows](DESKTOP.vi.md). Đóng cửa sổ sẽ dừng agent. Các lệnh bên dưới vẫn dành cho cách chạy CLI.
 
 ## Bổ sung DeepSeek
 

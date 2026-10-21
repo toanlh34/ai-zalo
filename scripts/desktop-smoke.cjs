@@ -8,6 +8,7 @@ const path=require('node:path');
   const data=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'jev-desktop-smoke-'));
   const portable=process.argv.includes('--portable');
   const packaged=process.argv.includes('--packaged')||portable;
+  if(packaged)for(const name of ['zod','zca-js','@modelcontextprotocol/sdk'])assert.ok(fs.existsSync(path.join(root,'release','win-unpacked','resources','engine','node_modules',name,'package.json')),`Missing bundled dependency: ${name}`);
   const env={...process.env,JEV_DESKTOP_DATA:data};delete env.ELECTRON_RUN_AS_NODE;
   let app;
   if(portable){

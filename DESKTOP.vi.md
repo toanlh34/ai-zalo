@@ -1,10 +1,12 @@
+> Bản 0.6.1 bổ sung [MCP quản trị app](MCP.vi.md): tạo/sửa trợ lý, gán AI và quản lý kiến thức từ Codex.
+
 > Bản 0.5.0: **Thiết lập AI** quản lý model/key; **Trợ lý** quản lý hồ sơ, skill và kết nối Zalo riêng. [Hướng dẫn mới](ASSISTANTS.vi.md).
 
 > Bản 0.4.0: đã thêm cửa sổ [Trợ lý & AI](ASSISTANTS.vi.md), hỗ trợ gán nhiều AI và dùng chung kết nối.
 
 # BIMUP Zalo Assistance — ứng dụng Windows
 
-Mở `release/BIMUP-Zalo-Assistance-0.5.0-Windows.exe`. Đây là app portable, không cần cài Node.js hoặc mở terminal để sử dụng. Claude CLI vẫn cần cài riêng nếu chọn Claude; DeepSeek chỉ cần API key và số dư.
+Mở `release/BIMUP-Zalo-Assistance-0.6.1-Windows.exe`. Đây là app portable, không cần cài Node.js hoặc mở terminal để sử dụng. Claude CLI vẫn cần cài riêng nếu chọn Claude; DeepSeek chỉ cần API key và số dư.
 
 ## Lần đầu sử dụng
 

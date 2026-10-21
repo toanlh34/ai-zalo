@@ -4,7 +4,7 @@ import {join,dirname} from 'node:path';
 import {readFileSync} from 'node:fs';
 const manifest=JSON.parse(readFileSync(join(process.env.LOCALAPPDATA,'Programs','BIMUP','ZaloAssistance','installation.json'),'utf8').replace(/^\uFEFF/,''));
 const root=dirname(manifest.executable),client=new Client({name:'bimup-admin-check',version:'1.0.0'});
-const transport=new StdioClientTransport({command:join(root,'resources','runtime','node.exe'),args:[join(root,'resources','engine','src','app-mcp.mjs')]});
+const transport=new StdioClientTransport({command:join(root,'resources','runtime','node.exe'),args:[join(dirname(root),'mcp-launcher.cjs')]});
 try{
   await client.connect(transport);
   const call=async(name,args={})=>{const r=await client.callTool({name,arguments:args});if(r.isError)throw Error(r.content[0].text);return JSON.parse(r.content[0].text);};

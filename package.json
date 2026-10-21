@@ -1,6 +1,6 @@
 {
   "name": "zalo-local-assistant",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "type": "module",
   "main": "desktop/main.cjs",
@@ -57,6 +57,13 @@
       {
         "from": ".desktop-engine",
         "to": "engine"
+      },
+      {
+        "from": ".desktop-engine/node_modules",
+        "to": "engine/node_modules",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
